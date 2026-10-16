@@ -1636,6 +1636,12 @@ struct VarDef {
     bool copybind = false;
     bool isglobal = false;
     bool isparam = false;
+    // Independently owned fields of a root declaration. These synthetic
+    // variables have the owner's scope and stable identities across loop
+    // checking passes, but are not source-level bindings.
+    vector<VarDef *> components;
+    VarDef *componentowner = nullptr;
+    int componentfield = -1;
     // One of the results of `a, b = f();` (VarDecl::results), which its one
     // assignment takes as the call's value: constructed at the target, as
     // `a = f()` would construct it (TypeCheck::CheckAssign).
