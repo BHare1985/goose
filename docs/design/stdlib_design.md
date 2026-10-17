@@ -613,9 +613,9 @@ well-typed slot. Bind such references in their own block, or use `update`.
   implementation.
 * Owned string keys: keep a `u8[>..]` text pool next to the
   `dictionary<u8[:], V>` (two locals of one scope, or a global pool); keys
-  are slices into the pool. A struct cannot hold both (one resizable per
-  struct, §3.4), which is spec TODO 8. An interner built on this idiom is a
-  candidate for a later module.
+  are slices into the pool. A `root struct` can now own both components in
+  one declaration (spec §3.4); an ordinary packed struct still cannot.
+  An interner built on this idiom is a candidate for a later module.
 * Insertion order: `dictionary` does not keep it. Where order matters, store
   values in the user's own `[>..]` and keep indices in the dictionary, which
   is what `lru.goose` does.
@@ -1030,7 +1030,8 @@ These operations can be expressed using existing functions and short loops:
   `each_split(s, ' ')` keeps the empty parts repeated spaces leave, which a
   command line wants dropped.)
 * Multiple-resizable containers (a deque, an owning string dictionary): the
-  language has one resizable per struct (§3.4); idioms in §5.3.
+  language now supports their state through `root struct` (spec §3.4); the
+  library APIs remain to be designed. See §5.3.
 * Binary serialization: Goose data is already its own serialized form
   (`bench/design.md`); `read_file` into a `u8[>..]` and spec TODO 16's
   whole-region copy are the path, and typed `read_u32_le`-style accessors
