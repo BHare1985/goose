@@ -184,6 +184,8 @@ enum {
     GS_E_RELNULL,      /* a non-null optional self-relative target has offset zero */
     GS_E_POPN,         /* pop_n of a negative count or more than the length */
     GS_E_QBOUND,       /* a queue limit of zero or less */
+    GS_E_ARRAYLEN,     /* array element count negative or beyond a data stack */
+    GS_E_ARRAYSLICE,   /* a nonempty slice is not wholly inside the array */
 };
 
 GS_API GS_NORETURN void gs_panic(const char *msg);
@@ -193,10 +195,10 @@ GS_API GS_NORETURN void gs_abort(int err, const char *file, int line);
 GS_API GS_NORETURN void gs_abort_msg(const uint8_t *msg, int64_t len, const char *file,
                                      int line);
 GS_API GS_NORETURN void gs_exit(int64_t code);
-GS_API GS_NORETURN void gs_idxfail(int64_t i, int64_t n, const char *file, int line);
-GS_API GS_NORETURN void gs_divfail(const char *file, int line);
 )GSRT"
-R"GSRT(GS_API GS_NORETURN void gs_divovf(const char *file, int line);
+R"GSRT(GS_API GS_NORETURN void gs_idxfail(int64_t i, int64_t n, const char *file, int line);
+GS_API GS_NORETURN void gs_divfail(const char *file, int line);
+GS_API GS_NORETURN void gs_divovf(const char *file, int line);
 /* The debug build's failing overflow and `as` checks. */
 GS_API GS_NORETURN void gs_ovf(int64_t a, const char *op, int64_t b, const char *type,
                                const char *file, int line);
@@ -352,12 +354,12 @@ static uint64_t gs_ld64(const void *p) { uint64_t v; memcpy(&v, p, 8); return v;
 /* The low k bytes of a word set (none for k <= 0, all for k >= 8): which
    bytes of a little-endian load lie within a length. */
 static uint64_t gs_bytemask(int64_t k) {
-    return k >= 8 ? ~(uint64_t)0 : k <= 0 ? 0 : ((uint64_t)1 << (k * 8)) - 1;
+)GSRT"
+R"GSRT(    return k >= 8 ? ~(uint64_t)0 : k <= 0 ? 0 : ((uint64_t)1 << (k * 8)) - 1;
 }
 
 /* memcpy, memmove and memcmp for a slice's elements. An empty slice's data
-)GSRT"
-R"GSRT(   pointer is NULL where the slice was zero-filled (default<T>(), a default
+   pointer is NULL where the slice was zero-filled (default<T>(), a default
    element), and C leaves all three undefined on a null pointer even for
    zero bytes. A copy of up to 16 bytes loads both overlapping halves before
    it stores them, and one of up to 256 bytes moves 16 at a time, the last 16
@@ -520,11 +522,11 @@ static T gs_mul_##SFX(T a, T b, const char *file, int line) { \
     return (T)r; } \
 static T gs_neg_##SFX(T a, const char *file, int line) { \
     int64_t r = -(int64_t)a; \
-    if (r < MIN || r > MAX) gs_ovf_neg(a, #SFX, file, line); \
+)GSRT"
+R"GSRT(    if (r < MIN || r > MAX) gs_ovf_neg(a, #SFX, file, line); \
     return (T)r; } \
 static T gs_shl_##SFX(T a, int64_t n) { \
-)GSRT"
-R"GSRT(    return (T)((uint64_t)a << (n & (BITS - 1))); } \
+    return (T)((uint64_t)a << (n & (BITS - 1))); } \
 static T gs_shr_##SFX(T a, int64_t n) { \
     return (T)((int64_t)a >> (n & (BITS - 1))); }
 
@@ -707,12 +709,12 @@ static uint64_t gs_divu_q(uint64_t x, uint64_t magic, uint8_t more) {
     uint64_t q;
     if (!magic) return x >> more;
     q = gs_mulhi_u64(magic, x);
-    if (more & GS_DIVU_ADD) return (((x - q) >> 1) + q) >> (more & GS_DIVU_SHIFT);
+)GSRT"
+R"GSRT(    if (more & GS_DIVU_ADD) return (((x - q) >> 1) + q) >> (more & GS_DIVU_SHIFT);
     return q >> more;
 #else
     (void)magic;
-)GSRT"
-R"GSRT(    return x >> more;   /* Never called: GS_DIVU_NONE takes the operator. */
+    return x >> more;   /* Never called: GS_DIVU_NONE takes the operator. */
 #endif
 }
 
@@ -883,11 +885,11 @@ GS_API int64_t gs_thread_start(void (*run)(void (*)(uint8_t *), uint8_t *),
                                void (*release)(void), void (*entry)(uint8_t *),
                                const void *args, int64_t argsize, int contained);
 /* Whether the worker returned rather than aborted, once it has ended. Where
-   `msg` is not NULL, the first such wait for a worker that aborted takes its
+)GSRT"
+R"GSRT(   `msg` is not NULL, the first such wait for a worker that aborted takes its
    message: `msg` and `len` are set to it, which the caller frees with
    gs_free_msg, or to NULL and no bytes. */
-)GSRT"
-R"GSRT(GS_API uint8_t gs_thread_wait(int64_t id, uint8_t **msg, int64_t *len,
+GS_API uint8_t gs_thread_wait(int64_t id, uint8_t **msg, int64_t *len,
                                const char *file, int line);
 GS_API void gs_free_msg(uint8_t *msg);
 
@@ -1082,13 +1084,13 @@ static int64_t gs_uleb_check(const uint8_t *p, const uint8_t *end, uint64_t *out
     int shift = 0;
     const uint8_t *q = p;
     for (;;) {
-        uint8_t b;
+)GSRT"
+R"GSRT(        uint8_t b;
         if (q >= end) return 0;
         b = *q++;
         if (shift > 63 || (shift == 63 && (b & 0x7e))) return 0;
         v |= (uint64_t)(b & 0x7f) << shift;
-)GSRT"
-R"GSRT(        if (!(b & 0x80)) {
+        if (!(b & 0x80)) {
             if (shift && !b) return 0;  /* Redundant high zero group. */
             break;
         }
@@ -1178,6 +1180,8 @@ static const char *gs_errmsgs[] = {
     "non-null relative reference encodes as null",
     "pop_n count negative or beyond the array's length",
     "queue limit of zero or less",
+    "invalid array length",
+    "slice not within this array",
 };
 
 /* Ends the process with `code`, its streams flushed: exit() and every
@@ -1345,9 +1349,9 @@ static uint64_t gs_stack_budget;
 static int64_t gs_mainregions, gs_workerregions;
 static int64_t gs_thread_cap = INT64_MAX;
 
-/* A region's own sizes travel with it: those reserved before a refusal
 )GSRT"
-R"GSRT(   halved the size are larger than those after. */
+R"GSRT(/* A region's own sizes travel with it: those reserved before a refusal
+   halved the size are larger than those after. */
 typedef struct {
     uint8_t *base;
     size_t usable, size;    /* size: with the guard gap */
@@ -1557,12 +1561,12 @@ static GS_NORETURN void gs_park(void) {
     for (;;) Sleep(INFINITE);
 }
 
-#else  /* posix */
+)GSRT"
+R"GSRT(#else  /* posix */
 
 #include <sys/mman.h>
 #include <unistd.h>
-)GSRT"
-R"GSRT(#include <signal.h>
+#include <signal.h>
 #include <pthread.h>
 
 /* The calling thread's native stack, from GS_NATIVE_SLOP below its lowest
@@ -1754,11 +1758,11 @@ static uint8_t *gs_os_reserve(size_t usable, size_t size) {
 }
 
 static void gs_release_region(const gs_region *r) {
-    if (munmap(r->base, r->size)) gs_panic("cannot release data stack address space");
+)GSRT"
+R"GSRT(    if (munmap(r->base, r->size)) gs_panic("cannot release data stack address space");
 }
 
-)GSRT"
-R"GSRT(/* Whether this is the first call of gs_end; and where the later ones wait.
+/* Whether this is the first call of gs_end; and where the later ones wait.
    TinyCC names the memory orders in its stdatomic.h alone. */
 #ifndef __ATOMIC_SEQ_CST
 #define __ATOMIC_SEQ_CST 5
@@ -1932,11 +1936,11 @@ typedef struct {
 } gs_sppath;
 
 #define GS_SPHEAD(p) ((gs_sphead *)(p)->base)
-#define GS_SPLEAF(p, i) ((gs_spleaf *)((p)->base + (i) * GS_SPAN_NODE))
+)GSRT"
+R"GSRT(#define GS_SPLEAF(p, i) ((gs_spleaf *)((p)->base + (i) * GS_SPAN_NODE))
 #define GS_SPINNER(p, i) ((gs_spinner *)((p)->base + (i) * GS_SPAN_NODE))
 
-)GSRT"
-R"GSRT(static int64_t gs_sp_newnode(gs_sppath *p) {
+static int64_t gs_sp_newnode(gs_sppath *p) {
     int64_t i = GS_SPHEAD(p)->chain;
     if (i) {
         GS_SPHEAD(p)->chain = GS_SPLEAF(p, i)->link;
@@ -2170,14 +2174,14 @@ static void gs_sp_delete(gs_sppath *p, int64_t k) {
     while (GS_SPHEAD(p)->height > 0 && GS_SPINNER(p, GS_SPHEAD(p)->root)->n == 1) {
         int64_t r = GS_SPHEAD(p)->root;
         GS_SPHEAD(p)->root = GS_SPINNER(p, r)->child[0];
-        GS_SPHEAD(p)->height--;
+)GSRT"
+R"GSRT(        GS_SPHEAD(p)->height--;
         gs_sp_dropnode(p, r);
     }
 }
 
 /* Takes cnt elements off the front of the span at position k of the path's
-)GSRT"
-R"GSRT(   leaf, or the whole span where it holds no more. */
+   leaf, or the whole span where it holds no more. */
 static void gs_sp_take(gs_sppath *p, int64_t k, int64_t cnt) {
     gs_spleaf *lf = GS_SPLEAF(p, p->node[p->h]);
     int64_t c = lf->cnt[k];
@@ -2397,10 +2401,10 @@ GS_API int64_t gs_spans_regrow(uint8_t *base, int64_t *n, uint8_t **top, int64_t
     return gs_spans_alloc(base, n, top, len, cnt);
 }
 
-/* ---------------------------------------------------------------------------
-   Byte search: std's find_any and find_pair (docs/stdlib.md). A set arrives
 )GSRT"
-R"GSRT(   as std's ByteSet, made by its byte_set, which gs_byteset lays out as the
+R"GSRT(/* ---------------------------------------------------------------------------
+   Byte search: std's find_any and find_pair (docs/stdlib.md). A set arrives
+   as std's ByteSet, made by its byte_set, which gs_byteset lays out as the
    Goose struct is (spec C.2: packed, in declaration order). `members` is
    the set. `kind` says how a block of bytes is tested for it: by comparing
    with 1 to 3 of `bytes` (kinds 1-3), or as the range bytes[0] .. bytes[0] +
@@ -2572,14 +2576,14 @@ static GS_SSSE3 GS_INLINE __m128i gs_bsm_tables(const gs_bsm *m, __m128i x) {
 #define GS_TABLES_A(x) gs_bsm_tables(&ma, x)
 #define GS_TABLES_B(x) gs_bsm_tables(&mb, x)
 
-static GS_INLINE int64_t gs_scan_any_k(const uint8_t *p, int64_t n, const gs_byteset *s, int ks) {
+)GSRT"
+R"GSRT(static GS_INLINE int64_t gs_scan_any_k(const uint8_t *p, int64_t n, const gs_byteset *s, int ks) {
     gs_bsm ms;
     gs_bsm_init(&ms, s, 0);
     GS_ANY_LOOP(GS_TEST_S)
 }
 
-)GSRT"
-R"GSRT(static GS_SSSE3 int64_t gs_scan_any_tables(const uint8_t *p, int64_t n, const gs_byteset *s) {
+static GS_SSSE3 int64_t gs_scan_any_tables(const uint8_t *p, int64_t n, const gs_byteset *s) {
     gs_bsm ms;
     gs_bsm_init(&ms, s, 1);
     GS_ANY_LOOP(GS_TABLES_S)
@@ -2764,13 +2768,13 @@ GS_API int64_t gs_fmt_i64(uint8_t *dst, int64_t v) {
    The numbers are naturals in 32-bit limbs, least significant first. The
    denominator s stays below 2^1079 (ten times 2^1075, for the smallest
    doubles), and the others below eleven times s. */
-typedef struct { int n; uint32_t d[36]; } gs_big;
+)GSRT"
+R"GSRT(typedef struct { int n; uint32_t d[36]; } gs_big;
 
 /* a = v << sh, for v > 0. */
 static void gs_big_set(gs_big *a, uint64_t v, int sh) {
     int w = sh >> 5, b = sh & 31, i;
-)GSRT"
-R"GSRT(    uint64_t lo = v << b, hi = b ? v >> (64 - b) : 0;
+    uint64_t lo = v << b, hi = b ? v >> (64 - b) : 0;
     for (i = 0; i < w; i++) a->d[i] = 0;
     a->d[w] = (uint32_t)lo;
     a->d[w + 1] = (uint32_t)(lo >> 32);
@@ -2988,7 +2992,8 @@ GS_API int64_t gs_fmt_quoted(uint8_t *dst, const uint8_t *s, int64_t n) {
 }
 
 /* stdout is unbuffered (gs_rt_start): each print is this one write. */
-GS_API void gs_out_bytes(const uint8_t *p, int64_t len) { fwrite(p, 1, (size_t)len, stdout); }
+)GSRT"
+R"GSRT(GS_API void gs_out_bytes(const uint8_t *p, int64_t len) { fwrite(p, 1, (size_t)len, stdout); }
 )GSRT"
     ) },
     { "runtime_threads.h", string_view(
