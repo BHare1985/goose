@@ -900,6 +900,11 @@ allocation header per node. A thousand random inserts:
 
 ### `self`, and sentinels
 
+The linked-list example below retains the **deprecated `reusable` builtin**:
+global pool-relative types cannot yet name `pool.items`. Use
+[`slot_pool<T>`](stdlib.md#slot_pool) and [`slice_pool<T>`](stdlib.md#slice_pool)
+for new code that does not need the [remaining migration features](design/root_structs.md#separate-follow-up-reusable-pools-in-the-stdlib).
+
 A non-optional relative reference has no null, so a structure whose links
 point back at itself could never be constructed — there is nothing yet to
 point at. `self`, legal only as the whole initializer of such a field, means
@@ -1005,12 +1010,16 @@ to a function is indexed the same way with plain references,
 ## 11. When lifetimes really are not nested
 
 Some data has lifetimes that do not nest: cache entries, mutable graph nodes,
-or files deleted in arbitrary order. Goose supports these uses with a
-`reusable` pool: a grow-only array the compiler pairs with a hidden
-freelist.
+or files deleted in arbitrary order. Goose supports these uses with the
+standard library's `slot_pool<T>`: a root struct bundling an `items` array and
+a freelist. Declare its owner as a local or global and pass it to functions
+as `slot_pool<T>&`.
 
 ```goose
-reusable var pool: Item[>..] = [];
+import slot_pool;
+struct Item { id: i32, weight: f32 }
+
+var pool = slot_pool<Item> {};
 
 let s0 = pool.alloc_index(Item { 10, 1.0 });
 let s1 = pool.alloc_index(Item { 11, 1.0 });
@@ -1046,13 +1055,17 @@ evens removed: 10 30 50   (6 slots)
 two more, both from the freelist: 10 30 50 7 8   (6 slots)
 ```
 
-There is a second flavour, `reusable[]`, that hands out *runs* of elements
+The [`slice_pool<T>`](stdlib.md#slice_pool) module hands out *runs* of elements
 rather than single slots — `alloc_slice(n)`, `realloc_slice(s, n)`,
 `free_slice(s)` — with a freelist of spans that merges neighbours. That is
 what you use for the child lists of an n-ary tree, where each node's entries
-want to be one contiguous run you can walk as a plain slice
-([`26_file_tree`](../samples/26_file_tree.goose) builds a whole `mkdir`/`mv`/
-`rm -r` file tree out of the two pools together).
+want to be one contiguous run you can walk as a plain slice. Both pool types
+expose their backing array as `pool.items`; its length includes freed storage.
+
+**`reusable` and `reusable[]` are deprecated** in favor of these library types.
+They remain available for existing code; removal is a later step.
+[`26_file_tree`](../samples/26_file_tree.goose) retains the builtins because
+its global pool-relative links need the remaining migration support.
 
 ---
 
@@ -1533,7 +1546,7 @@ imposes it.
 * **You have to think about where data lives.** Not constantly, but the
   question "who owns this, and how long does its scope last" is one you now
   answer explicitly. Most of the time the answer is "the function that builds
-  it", and that is free. When it is not, it is a `reusable` pool
+  it", and that is free. When lifetimes do not nest, use a library pool
   ([section 11](#11-when-lifetimes-really-are-not-nested);
   [spec §1.2](goose_spec.md#12-memory-model),
   [§5.4](goose_spec.md#54-reusable-arrays-safe-allocation-escape-hatch)).
@@ -1562,7 +1575,7 @@ imposes it.
 * **Whole-program compilation.** No separate compilation, no shared
   libraries of Goose code
   ([spec §10.1](goose_spec.md#101-whole-program-call-graph-order)).
-* **A `reusable` pool manages its elements loosely.** Nothing is freed and
+* **A pool manages its elements loosely.** Nothing is freed and
   nothing is unsafe, but a slot you handed back and then still name reads
   whatever its next owner put there — the array equivalent of a stale index,
   and yours to avoid ([section 11](#11-when-lifetimes-really-are-not-nested);

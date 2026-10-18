@@ -230,10 +230,17 @@ fn insert(pool: Node[>..]&, key: i32) {
 References are transparent (no `*`, no `->`), `.=` binds or retargets one, and
 `Node?` is a nullable reference that `if`, `guard` and `assert` narrow. The
 insert is one push and one store, and the push cannot invalidate `cur`. When
-lifetimes are not nested, a `reusable` pool pairs a grow-only array with a
-hidden freelist: `alloc_ref` reuses a slot or pushes, `free` hands one back,
+lifetimes are not nested, the standard library's [`slot_pool<T>`](docs/stdlib.md#slot_pool)
+pairs a grow-only `items` array with a freelist: `alloc_ref` reuses a slot or
+pushes, `free` hands one back,
 and since nothing is ever actually freed, a stale slot reads a *different value
 of the correct type* rather than corrupting memory.
+
+[`slice_pool<T>`](docs/stdlib.md#slice_pool) provides contiguous runs with
+allocation, free and resize operations. The language features `reusable` and
+`reusable[]` are **deprecated** in favor of these pool types. They remain
+available for existing code and the [remaining migration gaps](docs/design/root_structs.md#separate-follow-up-reusable-pools-in-the-stdlib);
+removal is a later step.
 
 ### Your data is already a file format
 
@@ -397,7 +404,7 @@ The [summary](bench/summary.md) explains the gains and losses;
 
 * You think about where data lives: who owns this, and how long does its scope
   last. Usually the answer is "the function that builds it", and that is free;
-  when it is not, it is a `reusable` pool.
+  when lifetimes do not nest, use a `slot_pool` or `slice_pool`.
 * Recursive functions cannot keep growable data across a recursive call;
   scratch ends before the call, and what outlives it is passed in as a pool.
 * Arrays of variable-size elements iterate but do not index (short of an index
@@ -405,7 +412,7 @@ The [summary](bench/summary.md) explains the gains and losses;
   and a variable-mode one cannot be overwritten. You choose per container.
 * No escaping closures, no function pointers, no dynamic dispatch beyond ADT
   tags, and whole-program compilation only.
-* A slot handed back to a `reusable` pool and still named reads whatever its
+* A slot handed back to a pool and still named reads whatever its
   next owner put there: a logic bug, never memory corruption.
 
 [Tutorial §18](docs/tutorial.md#18-what-it-costs-you) is the full list.
