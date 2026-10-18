@@ -27,8 +27,13 @@ what Goose's memory model and library give it:
 | Base64 | `base64/test.goose` | `base64.rs`: the library codec, a new buffer per call | `std`'s `base64`, whose loops the C compiler vectorizes; each buffer is a data-stack bump, freed at the loop body's brace |
 | Json | `json/test.goose` | `json_struct.rs` (serde, typed) | `json::Reader` maps the text onto `Coordinate`s as serde's derive does, building no tree |
 | Json | `json/test_dom.goose` | `json_value.rs` (serde `Value`), RapidJSON's `Document` | `json::parse`'s tree: fixed-size nodes in one array, linked by 4-byte self-relative offsets, strings as views of the text |
-| Matmul | `matmul/matmul.goose` | `matmul.jl` without threads: `c[i][j] += a[i][k] * b[k][j]` with j innermost, no transpose | a matrix is an array of row slices, the rows runs of one `reusable[]` pool; one `assert` per row lets every index in the inner loop go unchecked |
+| Matmul | `matmul/matmul.goose` | `matmul.jl` without threads: `c[i][j] += a[i][k] * b[k][j]` with j innermost, no transpose | a matrix is an array of row slices, the rows runs of one `slice_pool<f64>`; one `assert` per row lets every index in the inner loop go unchecked |
 | Primes | `primes/primes.goose` | `primes.rs`: sieve of Atkin, a trie of the primes' digits, a breadth-first walk | trie nodes in one array; each node's map is a run of (digit, node) pairs in a `reusable[]` pool; queue entries hold their prefix inline in a `u8[..16]` |
+
+The [paired pool measurements](../pool_workloads.md) found Matmul at parity
+with `slice_pool`. Primes keeps the deprecated builtin for now: the candidate
+migration measured about 7% slower in its timed trie-building workload. The
+historical Linux results below predate Matmul's pool migration.
 
 Two departures the other languages do not need, both forced by the memory
 model, so the same as "V and Python don't provide [unordered hashmaps] out
