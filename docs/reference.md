@@ -1363,6 +1363,12 @@ references can be optional, stored in ordinary structs or arrays, returned, and
 captured by nested functions, subject to normal lifetime and writability rules.
 Field access, UFCS, reflection and formatting work through those references.
 
+A mutable grow-only array field of a global `var` root can be named in compact
+reference and index types: `Node&<u32 in pool.items>`, `u32 in pool.items`, and
+`u32 upto pool.items`. The name resolves to that particular field's storage;
+another field or owner is a different array. Only direct fields are supported:
+the path cannot follow an alias, reference, index or nested field.
+
 The owner itself cannot be copied, reassigned, passed or returned by value, used
 as a temporary, or placed inside another struct or array. This applies even to a
 root with no resizable fields. `root` only acts as a modifier before `struct`;
@@ -1906,8 +1912,10 @@ resize fill or converted through a temporary array representation.
 
 ### Pool-relative links and `self`
 
-`pool` in `T&<u32 in pool>` names a global `var` or deprecated `reusable var` of a
-grow-only type whose elements hold a `T`; the pool is part of the type's
+`pool` in `T&<u32 in pool>` names a global `var` array (including deprecated
+`reusable var`) or a mutable array field of a global `var` root, such as
+`T&<u32 in pool.items>`. The array must be grow-only and its elements hold a `T`;
+the pool is part of the type's
 identity. The stored value is the offset from the pool's base plus one,
 so 0 is null in the optional form and a `u32` link spans a pool of 4 GB.
 A load is rooted at `pool`, exactly, wherever the link was read from,
@@ -1968,8 +1976,9 @@ non-optional relative-reference field whose pointee is the type being
 constructed, and for an `in pool` field only in a literal built inside
 that pool (a `push`, an `alloc_ref`, an element store). The `reusable`
 pool and `alloc_ref` are explained in [section 14](#14-reusable-pools).
-This example retains the deprecated builtin because global pool-relative types
-cannot yet name a root component such as `pool.items`.
+This example retains the deprecated builtin because its sentinel needs `self`
+constructed in the allocated slot; `slot_pool.alloc_ref` currently takes an
+already-constructed value.
 
 ### Which form
 
@@ -2483,8 +2492,9 @@ program.
 An **index type** `uN in a` (`u8`, `u16`, `u32` or `u64`) is an unsigned
 integer that is below `a.len` wherever it can be observed, and a **bound
 type** `uN upto a` is one that is at most `a.len`: the end of a range.
-`a` names a global `var` or `reusable var` of a grow-only type with
-fixed-size elements, and the type is part of the identity: `u32 in nodes`
+`a` names a global `var` array (including deprecated `reusable var`) or a mutable
+array field of a global `var` root, such as `u32 in graph.nodes`. It must be
+grow-only with fixed-size elements, and the type is part of the identity: `u32 in nodes`
 is neither `u32` nor `u32 in edges`. The value is the plain integer.
 
 ```goose

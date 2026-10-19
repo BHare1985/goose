@@ -86,7 +86,7 @@ usually allocated per query, not part of the node.
 ```
 type        := "const"? (prim | qname tyargs? | "(" type ")") postfix*
              | indextype
-indextype   := ("u8" | "u16" | "u32" | "u64") ("in" | "upto") qname
+indextype   := ("u8" | "u16" | "u32" | "u64") ("in" | "upto") qname ("." ident)?
 ```
 
 `u32 in nodes` is an *index type* of `nodes`, `u32 upto edges` a *bound type*
@@ -102,6 +102,9 @@ var edges: NodeId[>..] = [];
 `upto` is a keyword only directly after an unsigned type name in a type, as
 `in` already is inside `T&<u32 in pool>`. `qname` resolves as a pool's name
 does, in the namespace of the declaration the type is written in.
+It may include a direct field of a global root, as in `u32 in graph.nodes` or
+`u32 upto graph.edges`. The owner name may be namespace qualified; aliases,
+reference crossings, indexing and nested field paths are not accepted.
 
 ### 2.2 What a value means
 
@@ -115,6 +118,10 @@ compile error: a local or parameter has no name where a field's type is
 written (as for `in pool`), a grow-shrink or limited array can shrink, and a
 sequential array cannot be indexed. Unlike `in pool`, the element type is
 unrestricted.
+
+A mutable grow-only array field of a global `var` root satisfies the same
+contract. Its storage identity is the particular owner and field, and only
+that component is pinned against shrinking.
 
 The array is part of the type's identity: `u32 in nodes` is neither `u32`
 nor `u32 in edges`, and two widths of one array are different types. The
