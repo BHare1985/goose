@@ -124,9 +124,9 @@ def has_bce_annotations(f):
 def front_args(line, bce):
     """The flags of a positive fixture's one parse, roundtrip and typecheck
     run, by its first line and whether it has bce annotations."""
-    # The default -O1 is what the bce annotations describe.
+    # The bce annotations describe -O1.
     return ["--roundtrip"] + (["--parse"] if "parse-only" in line else
-                              ["--check"] + (["--bce-test"] if bce else []))
+                              ["--check"] + (["-O1", "--bce-test"] if bce else []))
 
 
 def runtime_defines(source):
@@ -1643,8 +1643,9 @@ def main():
     for f in tests:
         r.show(lambda f=f: fixtures[f].result().front)
 
-    # The optimizer runs at -O1 in every typecheck above; also exercise the
-    # other levels (and the --specs dump path) on the optimizer coverage file.
+    # The optimizer runs in every typecheck above, at -O1 for bce annotations
+    # and -O2 otherwise; also exercise every level (and the --specs dump path)
+    # on the optimizer coverage file.
     r.section("optimizer, stack report and C shapes")
 
     def optimize(lvl):

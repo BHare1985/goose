@@ -124,7 +124,7 @@ rest keep working; `goose foo.goose` is `goose run foo.goose`.
 
 | Verb | Does |
 |---|---|
-| `run` | fetches what the root declares, builds the native parts the program reaches, compiles the program in-process (TinyCC) and runs it; `-O1` by default, as today |
+| `run` | fetches what the root declares, builds the native parts the program reaches, compiles the program in-process (TinyCC) and runs it; `-O2` by default |
 | `build` | the same, then writes the C, compiles it and links an executable beside the root source (`foo`, `foo.exe`); `-O2` by default, Goose's inlining, while the C compiler optimizes at every level |
 | `check` | fetches the Goose sources it needs and typechecks; never builds C |
 | `fetch` | fetches every package the root declares, and builds nothing; `--update` re-fetches refs that are not commit hashes |

@@ -148,7 +148,7 @@ the slow steps (a line each, and on a terminal a live line below).
 | `--check` | stop after typecheck, optimization and BCE; no C is written |
 | `--diagnostics json` | print the compile's errors and warnings as JSON on stdout (`DiagnosticsJson`): one object each with its severity, message, file, line, column, end and related lines, and the text the terminal would have shown; the progress lines go to stderr. What an editor reads (§2, `docs/design/language_server.md`) |
 | `--offline` | fetch nothing (`package_nofetch`, `packages.h`): a declared package whose checkout is not in the cache is an error at its import, which `goose fetch` resolves |
-| `-O0`, `-O1` (default), `-O2` | inlining thresholds (§4); folding and propagation run at every level; base-case inlining, tail-recursion elimination and min/max regrouping need `-O1` or above |
+| `-O0`, `-O1`, `-O2` (default) | inlining thresholds (§4); folding and propagation run at every level; base-case inlining, tail-recursion elimination and min/max regrouping need `-O1` or above |
 | `--specs` | print every live specialization's optimized body |
 | `--stacks` | print the data stack count of the main program and of each worker, the regions they come to, the thread cap that gives `hardware_threads()`, and every function's share (`codegen_stacks.h`); with `--check` it runs the backend for the counts and writes nothing |
 | `--stack-reserve size` | the address space reserved per data stack, written as `-DGS_STACK_RESERVE` (K/M/G/T suffixes; at least 64 KB, at most 2^48) |

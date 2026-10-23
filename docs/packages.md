@@ -36,7 +36,7 @@ MSVC or clang on Windows, cc, gcc or clang elsewhere; `--cc clang`,
 `GOOSE_CC`, or `cc = "clang";` in `~/.goose/config` choose), compiles the
 runtime once per compiler into `~/.goose`, and links the program with the
 native parts of every package it uses. `goose check foo.goose` only
-typechecks. A build defaults to `-O2`, a run to `-O1`.
+typechecks. A build and a run both default to `-O2`.
 
 Everything the compiler makes on the way goes under `~/.goose`
 (`GOOSE_HOME` moves it): fetched packages, their builds, the runtime

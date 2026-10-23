@@ -491,7 +491,7 @@ and builds the C with debug information; `--dry-run` prints the commands a
 build would run, for a build system of your own; `-v` prints them as they
 run. Intermediates go under `~/.goose` (`GOOSE_HOME`), the runtime object
 compiled once per C compiler. Useful flags of both forms: `-O0`/`-O1`/`-O2`
-set the inlining level (a build defaults to `-O2`, a run to `-O1`),
+set the inlining level (`-O2` by default),
 `--bce-lines` reports the bounds checks kept per line, and `-DGS_DEBUG=1` is
 what `--debug` defines. Every resizable value lives on a data stack of 2 GB
 of reserved address space, committed as it is used: `--stack-reserve 16G`
