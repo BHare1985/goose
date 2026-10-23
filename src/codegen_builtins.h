@@ -1,6 +1,6 @@
-// Goose compiler — codegen's builtins (definitions of CodeGen members,
-// codegen.h): the builtin functions and array members (§3.3, §5.4), queues
-// and threads (§11.2).
+// Goose compiler â€” codegen's builtins (definitions of CodeGen members,
+// codegen.h): the builtin functions and array members (Â§3.3, Â§5.4), queues
+// and threads (Â§11.2).
 #pragma once
 
 namespace goose {
@@ -55,7 +55,7 @@ inline vector<string> CodeGen::EmitBuiltin(Call *c, Dst d0) {
         case B_PRINT: {
             // The whole line, newline included, is rendered before any of
             // it is written, so an argument that prints on its own (a call)
-            // cannot interleave with it, and it goes out as one write (§3.7).
+            // cannot interleave with it, and it goes out as one write (Â§3.7).
             auto b = TempBuilder();
             for (auto a : an) EmitFormatInto(b, a, ln, c);
             RenderLit(b, "\n");
@@ -267,7 +267,7 @@ inline vector<string> CodeGen::EmitBuiltin(Call *c, Dst d0) {
             auto tv = T();
             FixedLocal(t, tv);
             if (!FixedSize(t)) {
-                // A value of no bytes (§3.4): the node holds none to fill the
+                // A value of no bytes (Â§3.4): the node holds none to fill the
                 // object C gives it.
                 L("GS_MEMZERO(&", tv, ", sizeof(", tv, "));");
                 L("free(", nn, ");");
@@ -285,7 +285,7 @@ inline vector<string> CodeGen::EmitBuiltin(Call *c, Dst d0) {
         case B_APPEND: EmitAppend(an, ln); return {};
         case B_INDEX_OF: {
             // The checker proved the reference is an element of this very
-            // array (§3.3), so the distance is a whole number of elements
+            // array (Â§3.3), so the distance is a whole number of elements
             // inside the length: an exact divide, nothing to check.
             auto lv = RecvLoc(an[0]);
             auto v = ArrayView(lv);
@@ -348,7 +348,7 @@ inline vector<string> CodeGen::EmitBuiltin(Call *c, Dst d0) {
                 at = cat("(", ElemAddr(v, nl), ")");
             }
             // A relative-reference element leaves as the plain reference it
-            // loads as (§3.9): its offset is measured from the slot it
+            // loads as (Â§3.9): its offset is measured from the slot it
             // leaves, whose bytes nothing has written over yet.
             if (IsRelRef(elem))
                 return { LoadLoc(BytesLoc(at, elem, lv), c->rettypes[0], ln) };
@@ -460,7 +460,7 @@ inline vector<string> CodeGen::EmitBuiltin(Call *c, Dst d0) {
             auto lv = RecvLoc(an[0]);
             auto v = ArrayView(lv);
             // A resizable is the topmost value on its stack for its whole
-            // life (§1.3), so both flavors hand the element region back by
+            // life (Â§1.3), so both flavors hand the element region back by
             // dropping the top to the base; a limited array's capacity is
             // reserved and only its length moves.
             auto ak = lv.t->arr->akind;
@@ -587,7 +587,7 @@ inline bool CodeGen::UniformFillByte(Node *n, TypeExpr *t, int &byte) {
 
 // The element `n` a push or an alloc adds to an array of `elem`, as far as
 // it goes before its slot is claimed. The receiver is evaluated, then the
-// argument, then the element is added (§2), and the argument may itself
+// argument, then the element is added (Â§2), and the argument may itself
 // grow the array. A fixed-size element is therefore evaluated here, so that
 // it follows whatever the argument added and the returned reference names
 // it, and a relative-reference element is the plain reference its slot
@@ -595,7 +595,7 @@ inline bool CodeGen::UniformFillByte(Node *n, TypeExpr *t, int &byte) {
 // references of either form (a self-relative offset measures from where the
 // element lives, an `in pool` `self` is its position in the pool), are built
 // at the slot instead and give nothing here; the checker keeps the array
-// from growing while such a value is under construction (§1.3,
+// from growing while such a value is under construction (Â§1.3,
 // BuiltInPlace).
 inline string CodeGen::ElemValue(Node *n, TypeExpr *elem) {
     if (IsRelRef(elem)) {
@@ -612,7 +612,7 @@ inline string CodeGen::ElemValue(Node *n, TypeExpr *elem) {
 inline void CodeGen::StoreElemAt(Node *n, TypeExpr *elem, const string &e, const string &ev,
                                  Line ln) {
     // A relative-reference element stores the offset from its own slot,
-    // not the pointer (§3.9).
+    // not the pointer (Â§3.9).
     if (IsRelRef(elem))
         EmitRelStoreAt(cat("(uint8_t *)", e), elem, ev, ln, true, RelValue(n));
     else if (ev.empty()) GenAny(n, Dst { DK_LVALUE, cat("(*", e, ")"), elem });
@@ -657,10 +657,10 @@ inline vector<string> CodeGen::EmitPush(vector<Node *> &an, Line ln) {
 }
 
 // What push and alloc_ref return for the element just added at `e`, a
-// pointer to its slot: a reference to it (§3.3), which a receiver decaying it
+// pointer to its slot: a reference to it (Â§3.3), which a receiver decaying it
 // loads from (CallVal0). An element that is itself a reference gives the one
 // it holds instead, loaded if relative, as `&` of it does: there are no
-// references to references (§3.8).
+// references to references (Â§3.8).
 inline string CodeGen::NewElemResult(const string &e, TypeExpr *elem, const Loc &lv, Line ln) {
     if (elem->kind != TY_REF) return e;
     if (elem->ref->lenstorage >= 0) return LoadLoc(BytesLoc(e, elem, lv), elem, ln);
@@ -678,7 +678,7 @@ inline void CodeGen::EmitAppend(vector<Node *> &an, Line ln) {
     if (auto c = Is<Call>(src); c && c->builtin == B_COPY) src = c->FirstArg();
     // append(f()) where f returns a resizable, or a variable array in the
     // element-run form (C.3): the callee emits raw elements at our top and
-    // hands back the count -- contiguous by construction (§7.3). A callee
+    // hands back the count -- contiguous by construction (Â§7.3). A callee
     // with no run form falls back to a value-form call with its length
     // prefix slid out (inside EmitSpecCall). Control expressions, including
     // inlined calls, pass the same destination to each branch.
@@ -710,7 +710,7 @@ inline void CodeGen::EmitAppend(vector<Node *> &an, Line ln) {
     }
     // A literal of elements that are not fixed-size, or that hold relative
     // references (measured from where they are written), builds its run
-    // where the elements stay (§4.3): at the receiver's top, or in a limited
+    // where the elements stay (Â§4.3): at the receiver's top, or in a limited
     // array's free slots, the checker keeping the receiver from growing
     // meanwhile. Other elements are evaluated first, as a pushed fixed-size
     // one is, and copied.
@@ -775,7 +775,7 @@ inline vector<string> CodeGen::EmitAlloc(Call *c, vector<Node *> &an, Line ln) {
     // initializers, so nothing they free can change which one it is. A
     // fresh slot at the top joins the array only once the element is
     // written, as a pushed one does: until then no index reaches it, and the
-    // checker keeps the array from growing into it meanwhile (§1.3(4)).
+    // checker keeps the array from growing into it meanwhile (Â§1.3(4)).
     // Freed slots all lie below the length, since a pool never shrinks, so
     // the index tells which kind was taken.
     auto iv = T();
@@ -804,7 +804,7 @@ inline vector<string> CodeGen::EmitAlloc(Call *c, vector<Node *> &an, Line ln) {
     return { NewElemResult(e, elem, lv, c->line) };
 }
 
-// A slice pool (§5.4): the element region grows like any grow-only array's,
+// A slice pool (Â§5.4): the element region grows like any grow-only array's,
 // and the runtime's gs_spans_* keep the freelist of (index, count) spans.
 inline vector<string> CodeGen::EmitSlicePool(Call *c, vector<Node *> &an, Line ln) {
     auto lv = RecvLoc(an[0]);
@@ -812,12 +812,12 @@ inline vector<string> CodeGen::EmitSlicePool(Call *c, vector<Node *> &an, Line l
     auto v = ArrayView(lv);
     auto elem = v.elem;
     auto esz = FixedSize(elem);
-    assert(esz > 0);   // No element is zero-size (§3.4).
+    assert(esz > 0);   // No element is zero-size (Â§3.4).
     // A slice handed back becomes an index into the pool. An empty one can be
     // a default slice pointing at no storage at all; with no cells to free or
     // keep, index 0 serves it. A non-empty one the checker rooted at this pool
     // exactly starts a whole number of elements into the length; any other
-    // one is checked to, and to end inside the length (§5.4).
+    // one is checked to, and to end inside the length (Â§5.4).
     auto indexof = [&](const string &sv) {
         auto i = T();
         if (!c->poolcheck) {
@@ -933,7 +933,91 @@ inline void CodeGen::EmitSliceExtend(const Loc &lv, const string &end, int64_t e
     L("}");
 }
 
-// Default values (§4.2) for `count` elements of an array view from index
+// Two checked loop idioms whose zero defaults have no observable per-element
+// work: filling a whole slice, and appending from an array's length to an end.
+// Field defaults, relative references and arbitrary expressions keep their
+// ordinary evaluation order and construction code.
+inline bool CodeGen::BulkDefaultLoop(ForLoop *loop) {
+    if (loop->idxdef || loop->vdef->captured || loop->vdef->type->kind != TY_INT ||
+        loop->vdef->type->intstorage != IS_I64) return false;
+    auto loopbody = loop->body;
+    if (loopbody->stmts.size() != 1 || loopbody->tail) return false;
+    auto unref = [](Node *n) {
+        auto u = Is<Unary>(n);
+        return u && u->op == T_BITAND ? u->child : n;
+    };
+    auto lenof = [&](Node *n, Node *array) {
+        auto dot = Is<Dot>(n);
+        return dot && !dot->IsField() && dot->name == "len" && SamePath(dot->obj, unref(array));
+    };
+    Node *array = nullptr, *value = nullptr, *end = nullptr;
+    auto append = false;
+    if (auto a = Is<Assign>(loopbody->stmts[0]); a &&
+        (a->op == T_ASSIGN || a->op == T_DOTASSIGN) && loop->iterkind == IK_COUNT) {
+        auto index = Is<Index>(a->lval);
+        auto id = index ? Is<Ident>(index->idx) : nullptr;
+        if (!id || id->vdef != loop->vdef || !lenof(loop->iter, index->obj)) return false;
+        array = index->obj; value = a->rhs;
+    } else if (auto call = Is<Call>(loopbody->stmts[0]); call &&
+               call->builtin == B_PUSH && loop->iterkind == IK_RANGE) {
+        auto args = call->ValueArgNodes();
+        auto range = Is<RangeExpr>(loop->iter);
+        if (args.size() != 2 || !range || !lenof(range->lo, args[0]) ||
+            (!Is<Ident>(range->hi) && !Is<IntLit>(range->hi)) ||
+            range->exprtype->kind != TY_INT || range->exprtype->intstorage != IS_I64)
+            return false;
+        array = args[0]; value = args[1]; end = range->hi; append = true;
+    } else return false;
+    auto type = unref(array)->exprtype;
+    if (type->kind == TY_REF) type = type->ref->sub;
+    if (append ? !IsResz(type) || type->kind != TY_ARRAY : type->kind != TY_SLICE) return false;
+    auto elem = append ? type->arr->sub : type->sub;
+    function<bool(TypeExpr *)> flat = [&](TypeExpr *t) {
+        if (!IsFix(t)) return false;
+        switch (t->kind) {
+            case TY_INT: case TY_FLT: case TY_BOOL: return true;
+            case TY_STRUCT: return SI(t)->flat;
+            case TY_ARRAY: return t->arr->akind == A_FIXED && flat(t->arr->sub);
+            default: return false;
+        }
+    };
+    if (!flat(elem) || HasFieldDefaults(elem) || !FieldChainRoot(unref(array), true)) return false;
+    function<bool(Node *, TypeExpr *)> zero = [&](Node *n, TypeExpr *t) {
+        if (auto c = Is<Call>(n))
+            return c->builtin == B_DEFAULT && c->rettypes.size() == 1 && TEq(c->rettypes[0], t);
+        // Aggregate defaults can be expanded into their checked literals.
+        auto sl = Is<StructLit>(n);
+        if (!sl || t->kind != TY_STRUCT || !TEq(sl->exprtype, t)) return false;
+        auto si = SI(t);
+        for (size_t i = 0; i < si->st->fields.size(); i++)
+            if (!si->st->fields[i].ispad && !zero(sl->InitFor((int)i), si->ftypes[i])) return false;
+        return true;
+    };
+    if (!zero(value, elem)) return false;
+    auto lv = RecvLoc(array);
+    auto view = ArrayView(lv);
+    auto esz = FixedSize(elem);
+    if (append) {
+        NoteLen(lv.stk, view.lenlv);
+        auto first = T(), limit = T();
+        L("int64_t ", first, " = ", view.len, ";");
+        L("int64_t ", limit, " = ", GenX(end), ";");
+        L("if (", limit, " > ", first, ") {");
+        ind++;
+        L("if ((uint64_t)", limit, " > GS_STACK_RESERVE / ", esz,
+          ") gs_abort(GS_E_ARRAYLEN, ", LocArgs(loop->line), ");");
+        L("GS_MEMZERO(", Top(lv.stk), ", (size_t)((", limit, " - ", first, ") * ", esz, "));");
+        Bump(lv.stk, cat("(", limit, " - ", first, ") * ", esz));
+        L(view.lenlv, " = ", limit, ";");
+        ind--;
+        L("}");
+    } else {
+        L("if (", view.len, ") GS_MEMZERO(", view.elems, ", (size_t)(", view.len, " * ", esz, "));");
+    }
+    return true;
+}
+
+// Default values (Â§4.2) for `count` elements of an array view from index
 // `first`: one clear where the default is all zero bytes, else each built.
 inline void CodeGen::EmitDefaultElems(const ArrView &v, const string &first,
                                       const string &count, Node *init) {
@@ -1013,7 +1097,7 @@ inline vector<VarDef *> &CodeGen::ThreadGlobals(FnSpec *entry) {
 
 // thread_spawn(worker, args...) and thread_spawn_contained: the arguments
 // constructed contiguously, then the worker program's globals as copies of
-// this instance's, each as [int64 size][image] (§11.2); the thunk unpacks
+// this instance's, each as [int64 size][image] (Â§11.2); the thunk unpacks
 // them into the worker's fresh instance.
 inline vector<string> CodeGen::EmitThreadSpawn(Call *c, vector<Node *> &an) {
     usesthreads = true;
@@ -1139,7 +1223,7 @@ inline void CodeGen::EmitThreadThunk(FnSpec *sp, int64_t stacks) {
                    FixedSize(pt), ";\n");
             args.push_back(cat("a", i));
         } else if (!FixedSize(pt)) {
-            // A value of no bytes (§3.4): the image holds none to fill the
+            // A value of no bytes (Â§3.4): the image holds none to fill the
             // object C gives it.
             Append(b, "    ", CT(pt), " a", i, " = {0};\n");
             args.push_back(cat("a", i));
@@ -1216,7 +1300,7 @@ inline void CodeGen::EmitThreadThunk(FnSpec *sp, int64_t stacks) {
 // Serialization (docs/design/serialization.md): to_bytes and bytes_of write
 // an array's element region out, from_bytes verifies one back in.
 
-// An image is little-endian by definition (§7 of the design), which every
+// An image is little-endian by definition (Â§7 of the design), which every
 // target this compiles for is; the test folds away, and exists so that a
 // big-endian host fails loudly rather than writing bytes only it can read.
 inline void CodeGen::EmitLeCheck(Line ln) {
@@ -1276,7 +1360,7 @@ inline void CodeGen::AppendBytes(const Loc &lv, const string &src, const string 
 }
 
 // The destination a resizable or variable builtin result is built at, in the
-// shapes §7.3 admits: the caller's header, a value slot that takes a length
+// shapes Â§7.3 admits: the caller's header, a value slot that takes a length
 // prefix in front of the elements, or a fresh temporary when the result has
 // no destination of its own. `elems` is where the elements start.
 inline CodeGen::RzDest CodeGen::OpenRzDest(TypeExpr *t, Dst d0, Line ln, const char *what) {
@@ -1316,7 +1400,7 @@ inline void CodeGen::CloseRzDest(RzDest &rd, const string &count) {
 }
 
 // bytes_of(a): the element region as a u8[:], no copy. The view is never
-// writable at the language level (§9.5), so the const the payload pointer
+// writable at the language level (Â§9.5), so the const the payload pointer
 // carries is dropped here rather than expressed in the slice type.
 inline vector<string> CodeGen::EmitBytesOf(Call *c, vector<Node *> &an, Line ln) {
     EmitLeCheck(ln);
