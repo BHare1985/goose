@@ -6246,7 +6246,7 @@ failures.
    as `562949953421312.2` elsewhere.
    **Resolved:** the runtime finds the shortest digits, and the nearest of
    those, exactly, in integers (section 6.9), and `CatOne` takes them from
-   `std::to_chars`. `test/runtime/float_text_shortest.goose` prints the
+   `std::to_chars`. `test/runtime/float_text_digits.goose` prints the
    powers of two and ties.
 
 9. **Some construction paths still copy whole fresh results.** The
