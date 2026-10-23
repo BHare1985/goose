@@ -309,7 +309,7 @@ shared summary (item 4).
 **Tracks.** Which call sites may share one checked body.
 
 **How.** The key is types, bindings, literal parameters, function values,
-narrowed environment, `escaped`, `needs`, and per argument a `RootArg` with
+narrowed environment, `needs`, and per argument a `RootArg` with
 class number, `depthkey`, writability, pool, and four grow-shrink and view
 bits; `exact` and `concrete` are ANDed across sites afterwards and settled
 by `SettleParamRootExactness`. A back edge reuses the in-progress body
@@ -542,7 +542,7 @@ fixpoint of its own.
 
 Keep the specialization key to what changes the body's meaning (types,
 bindings, literal parameters, function values, writability, pools,
-`escaped`, `needs`). Let the analysis record obligations over class roots
+`needs`). Let the analysis record obligations over class roots
 (`A outlives B`, `A is not B`, `A holds no grow-shrink array`, `A's
 contents are exactly one array`) that each call site discharges with its
 concrete roots, generalizing `liveshrinks`. Deletes `depthkey`/`EnvReach`,
