@@ -136,16 +136,16 @@ In `respond`, the inline Goose DTO takes 507/491 ms against Rust's DTO at
 Compare matching interfaces when deciding which result applies to an
 application.
 
-**Read the aggregate with the row-level controls.** The aggregate takes the
-fastest Goose implementation separately for each backend and comparison
-tier, and takes each memory figure independently from the smallest
-implementation. Thus `graph` speed uses CSR while its memory figure uses
-linked adjacency, and `words` speed uses the hand-written table while
-memory uses `dictionary`. The `respond` headline uses streaming, and `blur`
-uses row slices under MSVC and flat indexing under clang. These are not the
-resource profiles of a single implementation. `words` also compares
-different hash functions and table policies; the Goose dictionary uses less
-memory than its hand-written table but runs more slowly.
+**The aggregate combines results from different implementations.** For each
+backend and comparison tier, it uses the fastest Goose implementation. Memory
+figures are selected separately, using the implementation with the lowest memory
+use. For example, `graph` speed comes from CSR and its memory figure from linked
+adjacency. `words` speed comes from the hand-written table and its memory figure
+from `dictionary`. The `respond` headline uses streaming; `blur` uses row slices
+under MSVC and flat indexing under clang. No single implementation has all of
+these results. Also, `words` compares different hash functions and table
+policies: the Goose dictionary uses less memory than its hand-written table but
+runs more slowly.
 
 **These are whole-process measurements on one machine.** They include input
 generation, construction and teardown, use the best of three runs after two
@@ -649,19 +649,18 @@ or data structure, both are listed:
   and the one-pass index-linked arena. CSR is the fastest in every language
   and is index-based in every language, so `graph` is the only benchmark where
   the references-versus-indices question does not show up in the fastest row.
-* `words` and `lru` have a `HashMap` row and a hand-rolled open-addressed
-  table, because std's default hasher is chosen for security rather than
-  speed, and the usual Rust fix for that, a hasher crate, is outside a
-  std-only suite. In `lru` both rows use the same `Vec` arena and free list
-  for the nodes. std has no intrusive list, and `LinkedList` gives no way to
-  refer to an individual node, so the idiomatic Rust LRU is *already* the
-  arena, and the two rows differ only in the map.
+* `words` and `lru` have both a `HashMap` row and a hand-written open-addressed
+  table. std's default hasher prioritizes security over speed. Rust programmers
+  commonly substitute a hasher crate, but this suite allows only std. In `lru`,
+  both rows use the same `Vec` arena and free list for the nodes; only the map
+  differs. The arena is also the idiomatic choice here: std has no intrusive
+  list, and `LinkedList` provides no way to refer to an individual node.
 * `respond` has a DTO row (`String` and `Vec<Item>` built per request, rendered
   by a function returning a fresh `String`) and a streaming row that writes the
   JSON directly into one reused `String`, mirroring the two Goose rows.
-* `blur` has the obvious row that indexes everything, and the
-  row-slice/`windows(3)` iterator style a Rust programmer switches to when a
-  profiler shows bounds checks. Here a profiler would not show them (see the
+* `blur` has a version that indexes every element and a version using row slices
+  and `windows(3)` iterators. The latter is a common way to avoid bounds checks
+  when profiling shows they are costly. They are not costly here (see the
   bounds-check section).
 
 Everything else is a single row. The aggregate table compares Goose against
@@ -985,13 +984,13 @@ cursor, the `return from` discriminant and a varint decode on values that
 mostly need two bytes.
 
 **Flat scalar kernels depend on backend optimization, with no memory
-advantage.** `blur` in its obvious form is 3.3x behind flat Rust under v145,
-where MSVC leaves the loop scalar because it cannot rule out that `dst`
-aliases `src`, and 1.10x *ahead* of it under clang (256 against 282 ms);
-written over row slices it is level with Rust under both. `particles` is
-2-4% ahead of Rust on identical memory, which is within the noise of the
-row. There is no Goose advantage on either beyond noise, and the design did
-not predict one.
+advantage.** The flat, indexed form of `blur` is 3.3x slower than flat Rust
+under v145. MSVC leaves the loop scalar because it cannot rule out `dst`
+aliasing `src`. Under clang, the same form is 1.10x *faster* than Rust (256
+against 282 ms). Written over row slices, it is level with Rust under both
+backends. `particles` is 2-4% ahead of Rust with identical memory use, which is
+within the noise of that row. Neither benchmark shows a Goose advantage beyond
+noise, and the design did not predict one.
 
 **Pointer-linked adjacency loses to CSR, in all three languages.** On `graph`
 the one-pass linked build is 5-6x slower to traverse than two-pass
@@ -1078,10 +1077,10 @@ parts, and the standard library.
 **Difficulties encountered:**
 
 * **Inline child arrays need their count at construction.** The A.2 shape
-  `(T&<u32>)[varint]` can only be used when the children exist before the
-  parent is built and their number is known; a builder that discovers them
-  as it goes uses a limited `[..k]` array inside a fixed-size node (`scene`,
-  17 bytes for four links) or sibling links (`sexp`).
+  `(T&<u32>)[varint]` requires the children to exist and their number to be
+  known before the parent is built. A builder that discovers children as it goes
+  uses a limited `[..k]` array inside a fixed-size node (`scene`, 17 bytes for
+  four links), or sibling links (`sexp`).
 * **A plain reference parameter cannot be stored relatively outside a
   recursive cycle.** `fn link(prev: Node?) { pool.push(Node { next: prev }) }`
   is rejected at any call site that passes a pool-rooted reference: the
@@ -1278,13 +1277,13 @@ resize. As a result `blur` proved all ten checks from what `main` knows and
 ran at the speed of the asserted kernel under both toolchains (1.75x under
 v145, 141 to 77 ms at the time). What remains:
 
-1. **Identify a reference parameter's root class with the pool it came
-   from, outside a recursive cycle too.** A non-recursive function that takes
-   a `Node?` and stores it into a `Node&<u32>?` field of the same pool is
-   rejected today, though the identical code inside a `recursive` cycle is
-   accepted; the cycle machinery already computes what is needed. This is what
-   stops a linked structure's helper functions from being factored out of the
-   cycle that builds it.
+1. **Identify a reference parameter's root class with its source pool outside
+   recursive cycles too.** A non-recursive function that takes a `Node?` and
+   stores it into a `Node&<u32>?` field of the same pool is rejected today. The
+   identical code inside a `recursive` cycle is accepted; the cycle machinery
+   already computes the information needed. This restriction prevents
+   linked-structure helpers from being factored out of the cycle that builds the
+   structure.
 2. **Specialise the library's element loops.** `push_n` costs 2-3% against the
    `for` loop it replaces and blocks a bounds-check elision downstream, which
    is why two benchmarks kept their loops. The generic form
@@ -1293,10 +1292,19 @@ v145, 141 to 77 ms at the time). What remains:
    `interp`), and match expression-bodied folds (`if c { 0 } else { 1 + f(x) }`)
    in tail-recursion elimination.
 
-Ideas that were measured and should **not** be done: array-contents invariants
-for the bounds-check pass (more elisions, no measurable time), merging tag
-dispatch (1%), dropping `#pragma pack(1)` where the layout is already gap-free
-(no difference on either backend), fusing an *optional* relative-reference load
-with its null test (both backends get worse), and rewriting benchmark code so
-the bounds-check pass can prove loaded indices (no measurable gain).
+Measurements ruled out the following ideas:
+
+* Array-contents invariants for the bounds-check pass: more checks removed, but
+  no measurable time saved.
+
+* Merging tag dispatch: a 1% gain.
+
+* Dropping `#pragma pack(1)` where the layout is already gap-free: no difference
+  on either backend.
+
+* Fusing an *optional* relative-reference load with its null test: both backends
+  get worse.
+
+* Rewriting benchmark code so the bounds-check pass can prove loaded indices: no
+  measurable gain.
 

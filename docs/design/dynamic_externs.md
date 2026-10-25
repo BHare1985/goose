@@ -72,19 +72,24 @@ sidecar, and in JIT mode without a C toolchain. Written against the tree at
 
 ## 2. The boundary today
 
-An `extern fn` is implemented by one of three things (spec §7.10,
-implementation §6): the runtime (`gs_os_*`, `gs_sqrt`), whose prototypes
-`runtime_ext.h` declares; a header given with `--include`, written against
-the generated typedefs; or a package's native part (`docs/packages.md`),
-which is C sources or a CMake target that the compiler builds once per
-toolchain and links statically. For a JIT run the native part is built again
-as a shared library exporting one table, `goose_symbols`. The compiler loads
-that table (`process.cpp`, `LoadSharedSymbols`) and passes its symbols to
-TinyCC one by one (`tcc_add_symbol`, `jit.h`). Codegen emits a prototype for
-every used extern the runtime does not declare, and calls the symbol
-directly (`EmitExternCall`, `ExternProto`, `codegen_calls.h`).
-`NativePackagesUsed` (`native.h`) maps the used externs to the packages
-whose native parts are linked.
+An `extern fn` has one of three implementations (spec §7.10, implementation §6):
+
+* The runtime (`gs_os_*`, `gs_sqrt`), with prototypes declared in
+  `runtime_ext.h`.
+
+* A header supplied with `--include`, written against the generated typedefs.
+
+* A package's native part (`docs/packages.md`): C sources or a CMake target,
+  built once per toolchain and linked statically.
+
+For a JIT run, the native part is built again as a shared library exporting one
+table, `goose_symbols`. The compiler loads that table (`process.cpp`,
+`LoadSharedSymbols`) and passes its symbols to TinyCC one by one
+(`tcc_add_symbol`, `jit.h`). Codegen emits a prototype for every used extern
+that the runtime does not declare, and calls the symbol directly
+(`EmitExternCall`, `ExternProto`, `codegen_calls.h`). `NativePackagesUsed`
+(`native.h`) maps the used externs to the packages whose native parts are
+linked.
 
 To bind an installed C library this way, a package needs a native part
 whose only content is the link line: a sidecar with `c_libs = ["SDL2"]`,
@@ -321,8 +326,8 @@ last.
   let win = SDL_CreateWindow(title[0], 100, 100, 640, 480, 0);
   ```
 
-  This is explicit about what crosses the boundary, but clumsy; the natural
-  follow-up is a `stdlib` `ffi` module with the two helpers below.
+These calls show exactly what crosses the boundary, but are awkward to write. A
+`stdlib` `ffi` module could provide the two helpers below.
 * **Structs by value and by reference** cross in the packed layout of
   C.2, which is C's layout only when Goose's fields are already aligned as
   C would place them. `SDL_Rect { int x, y, w, h }` matches `struct Rect {
@@ -541,10 +546,10 @@ One working commit each, tests green at every step:
   import, `(import "env" "log")`, with no runtime binding. When
   `wasm.md` is implemented the block maps onto imports by its library
   string; nothing here prevents it.
-* **Cross-compilation** is not something the compiler does, but the
-  generated C is portable and this design keeps it so (the runtime picks
-  the spelling); if the compiler ever targets another platform, the
-  sidecar's suffixed lists are already per target.
+* **Cross-compilation.** The compiler does not currently cross-compile. The
+  generated C remains portable because the runtime chooses the library spelling.
+  If cross-compilation is added, the sidecar's suffixed lists already
+  distinguish targets.
 * **`long` and other platform-sized C types.** A declaration cannot say
   "C `long`". If the language gets a `const` platform test, two blocks
   under such a test would work; until then, an adapter is needed.

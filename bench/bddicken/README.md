@@ -116,10 +116,10 @@ much further with the resulting code: because the function is static and
 provably pure, gcc inlines the recursion several levels deep into the
 timing loop and merges the identical calls that this exposes. With
 `-fno-ipa-pure-const` the same program takes 12.9 ms, 35 times as long. The
-benchmark's rules allow that ("if some compiler finds ways to avoid
-recursive calls without any hints, than that is a result"), but gcc does
-not do it for the C version (19.5 ms as one static function in one file),
-and clang does it for neither.
+benchmark's rules allow this optimization: "if some compiler finds ways to
+avoid recursive calls without any hints, than that is a result". However, gcc
+does not apply it to the C version, which takes 19.5 ms as one static function
+in one file. Clang applies it to neither version.
 
 **loops**: `j % u` divides by a value the loop does not change. Goose
 computes a libdivide-style magic number for the divisor before the loop
@@ -128,11 +128,15 @@ and Rust leave a `div` instruction in the loop. The operands are `u32`, so
 the magic number is a 32-bit one (`gs_divu32_gen`, `gs_divu32_q`), and the
 quotient is the high half of a 32 by 32-bit product. A 64-bit magic number
 needs the high half of a 64 by 64-bit product instead, which x86-64 has
-only as a scalar instruction. With `-march=native` clang vectorizes the
+only as a scalar instruction.
+
+With `-march=native` clang vectorizes the
 whole inner loop with AVX-512, including the remainder, and Goose takes
 4.6 ms. With a 64-bit magic number the same program took 44.6 ms, and
 33.6 ms with `-march=native`, where clang vectorized only the additions
-around the multiplications. gcc 13 also vectorizes the loop with
+around the multiplications.
+
+gcc 13 also vectorizes the loop with
 `-march=native` (5.1 ms in WSL), but only because of two details of the
 generated C. Goose stores `a[i]` written the same way as it loads it, as
 `(*a).e[i]`, rather than through a pointer taken first. And it fails

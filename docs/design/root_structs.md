@@ -175,13 +175,14 @@ In particular:
 * Read-back, holder/store records, effect summaries, construction conflicts,
   and recursive specialization must propagate component identities consistently.
 
-Current code to audit includes `RootAlt`/`Roots` in `src/ast.h`,
+Code to audit includes `RootAlt`/`Roots` in `src/ast.h`,
 `RootedAtReceiver`/`OneArrayOf` in `src/typecheck_types.h`, and
-`SoleResizableIn`, growth logs and shrink summaries in
-`src/typecheck_builtins.h`. The present root-set join invariant merges entries
-by owning variable; adding paths requires revisiting join/equality/caching laws,
-not merely adding a field to the structure. Existing packed structs can still
-share one region: a field path is not automatically a new region everywhere.
+`SoleResizableIn`, growth logs, and shrink summaries in
+`src/typecheck_builtins.h`. Root-set joins currently merge entries by owning
+variable. Adding field paths therefore requires changes to the rules for joins,
+equality, and caching as well as a new field in the data structure. Existing
+packed structs can still share one region; a field path does not always identify
+a separate region.
 
 During investigation, small typecheck probes against the available compiler
 showed that a scalar allocator with separate data and freelist arguments accepts
@@ -194,9 +195,9 @@ cases.
 
 ## Code generation and performance
 
-Preserving efficient array access is an explicit requirement. A root reference
-must not become an unexplained permanent extra load inside hot loops or disable
-the existing array optimizations merely because arrays are grouped.
+Array access must remain efficient. Grouping arrays in a root struct must not
+disable existing array optimizations or add an unexplained load on every
+iteration of a hot loop.
 
 The current backend already has relevant machinery:
 

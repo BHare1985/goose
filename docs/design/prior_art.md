@@ -300,14 +300,15 @@ no safety claim beyond the placement.
 
 ### 2.10 Automatic pool allocation
 
-[Lattner and Adve, PLDI 2005](https://llvm.org/pubs/2005-05-21-PLDI-PoolAlloc.html)
-partition a C program's heap objects into a statically determined set of
-pools, created and destroyed at the entry and exit of the function in which
-each non-escaping data structure lives. It is the nearest precedent for a
-compiler computing a fixed set of allocation areas with scope-bound lifetimes.
-However, objects are assigned to pools by data-structure identity from a
-points-to analysis rather than by liveness, the pools hold separately
-allocated objects, and the transformation adds no safety.
+[Lattner and Adve, PLDI
+2005](https://llvm.org/pubs/2005-05-21-PLDI-PoolAlloc.html) partition a C
+program's heap objects into a statically determined set of pools. Each pool is
+created and destroyed on entry to and exit from the function where its
+non-escaping data structure lives. This is the nearest precedent for a compiler
+computing a fixed set of allocation areas with scope-bound lifetimes. The
+assignment rule differs: it uses data-structure identity from a points-to
+analysis, not liveness. The pools also hold separately allocated objects, and
+the transformation adds no safety.
 
 ### 2.11 Fels
 
@@ -323,29 +324,30 @@ growth rule.
 
 ### 2.12 Real-time Java's scoped memory, and its static typings
 
-The RTSJ's [`ScopedMemory`](https://www.rtsj.org/specjavadoc/javax/realtime/ScopedMemory.html)
-areas are entered and left on a scope stack, reclaimed en masse, and bound by
-the rule that an object in an outer, longer-lived area may not reference an
-object in an inner area. That rule is Goose's store rule, checked at run time
-on every assignment. [Scoped Types (Zhao, Noble, Vitek, RTSS
-2004)](https://janvitek.org/pubs/rtss04.pdf) make the check static at the
-granularity of Java packages. [Boyapati, Sălcianu, Beebee and Rinard, PLDI
-2003](https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf) make
-it static with ownership and region parameters on classes, whose "last in
-first out" region lifetimes give an outlives relation. None of these has
-growth, inline nesting or destination placement.
+The RTSJ's
+[`ScopedMemory`](https://www.rtsj.org/specjavadoc/javax/realtime/ScopedMemory.html)
+areas are entered and left on a scope stack, and reclaimed as a whole. An object
+in an outer, longer-lived area may not reference an object in an inner area.
+This is Goose's store rule, checked at run time on every assignment. [Scoped
+Types (Zhao, Noble, Vitek, RTSS 2004)](https://janvitek.org/pubs/rtss04.pdf)
+check it statically at the granularity of Java packages. [Boyapati, Sălcianu,
+Beebee and Rinard, PLDI
+2003](https://people.csail.mit.edu/rinard/techreport/MIT-LCS-TR-869.pdf) use
+static checks with ownership and region parameters on classes. Their "last in
+first out" region lifetimes provide an outlives relation. None of these systems
+has growth, inline nesting, or destination placement.
 
 ## 3. Multiple stacks put to other uses
 
 Several systems have more than one stack, or a stack where objects are freed
 en masse, but none of them uses its stacks the way Goose uses its data stacks.
 
-* **Forth** keeps a data stack, a return stack and a floating-point stack,
-  which hold operands, one cell each. Its dictionary is the part that
-  resembles Goose: `HERE` is the next free address, `ALLOT` and `,` extend
-  the one region under construction contiguously, a negative `ALLOT` or
-  `MARKER` releases memory in LIFO order, and addresses below `HERE` never
-  move ([Forth-2012 §3.3.3](https://forth-standard.org/standard/usage),
+* **Forth** has a data stack, a return stack, and a floating-point stack. They
+  hold operands, one cell each. Its dictionary resembles Goose's storage model:
+  `HERE` is the next free address, while `ALLOT` and `,` extend the region under
+  construction contiguously. A negative `ALLOT` or `MARKER` releases memory in
+  LIFO order. Addresses below `HERE` never move ([Forth-2012
+  §3.3.3](https://forth-standard.org/standard/usage),
   [`MARKER`](https://forth-standard.org/standard/core/MARKER)). There is only
   one region, and nothing is checked.
 * **Prolog's WAM** has a global stack on which structures are built, a local
@@ -391,11 +393,12 @@ Goose's lifetime rule is that a reference may not outlive the variable that
 owns its target, checked by scope nesting with no annotations. This rule has
 relatives that say nothing about where data lives.
 
-* Algol 68's scope rule, that the scope of an assignment's left side may not
-  exceed that of its right, was the first static check of this shape over
-  stack-allocated (`loc`) objects, with a run-time check where the static one
-  did not decide ([Berry, 1970](https://cs.uwaterloo.ca/~dberry/FTP_SITE/reprints.journals.conferences/Berry1970ImpleModelsA68.pdf)).
-  Ada's accessibility levels (§2.4) are its descendant.
+* Algol 68 requires the scope of an assignment's left side to be no wider than
+  that of its right side. This was the first static check of this kind for
+  stack-allocated (`loc`) objects. A runtime check handles cases that the static
+  check cannot decide ([Berry,
+1970](https://cs.uwaterloo.ca/~dberry/FTP_SITE/reprints.journals.conferences/Berry1970ImpleModelsA68.pdf)).
+  Ada's accessibility levels (§2.4) descend from this rule.
 * Second-class values ([Osvald, Essertel, Wu, González-Alayón, Rompf, OOPSLA
   2016](https://www.cs.purdue.edu/homes/rompf/papers/osvald-oopsla16.pdf))
   may be passed down but never stored or returned, giving "stack-bounded

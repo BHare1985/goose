@@ -1,10 +1,9 @@
 # Goose documentation
 
 Goose is a memory-safe systems language with no heap allocator, garbage
-collector or lifetime annotations ([what it is and why](../README.md)).
-This page is the map of its documentation. The language is described
-four times, at increasing depth, and the rest of the documents cover the
-library, the tools and the compiler.
+collector, or lifetime annotations ([what it is and why](../README.md)). Start
+with the language guides below, arranged from introduction to detailed
+specification. The other documents cover the library, tools, and compiler.
 
 ## The language, in reading order
 

@@ -308,13 +308,12 @@ them.
 
 ### 3.5 Scratch buffers that hand out slices
 
-`calc` reads its input through a global grow-shrink buffer by index because a
-grow-only array has no `clear` and a grow-shrink one cannot be sliced.
-A flow-sensitive relaxation, under which `clear()` on a grow-only *local* is
-legal at a point where no reference or slice rooted at it is live, would
-give the "reusable scratch that can be sliced" the spec's TODO 4 asks for,
-at no runtime cost. This is not a speed item; it removes the only place
-where the new benchmarks had to choose between reuse and references.
+`calc` reads a global grow-shrink input buffer by index because grow-only arrays
+have no `clear` and grow-shrink arrays cannot be sliced. Allowing `clear()` on a
+grow-only *local* when no reference or slice rooted at it is live would provide
+the reusable, sliceable scratch space requested by the spec's TODO 4, at no
+runtime cost. This would resolve the only case in the new benchmarks that forced
+a choice between reuse and references; it is not expected to improve speed.
 
 ### 3.6 Arithmetic width and `varint` in the performance notes
 

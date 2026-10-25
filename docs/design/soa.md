@@ -87,15 +87,16 @@ page offset of its own stack, and through 4K aliasing this makes a six-array
 version of the particles kernel 2x slower (measurements below). Nothing tells
 the compiler that the arrays are parallel either.
 
-A complete struct-of-arrays feature was estimated at about 2,300 lines, 90%
-of it codegen. In that design, element references and slices become proxies
-that ordinary functions accept, layouts are chosen per specialization, and
-arrays are returned into column destinations. Most of that code is the cost
-of letting an element or a slice escape into code written for ordinary
-arrays. A column array never lets anything escape: it is its own array kind,
-it coerces to nothing, and no reference, slice or view into it can exist. The
-remaining implementation consists of storage handling and a few array
-members, at about a third of the estimated size.
+A complete struct-of-arrays feature was estimated at about 2,300 lines, 90% in
+codegen. That design lets ordinary functions accept element references and
+slices through proxies. It also chooses layouts per specialization and returns
+arrays into column destinations. Most of the code supports using an element or
+slice in functions written for ordinary arrays.
+
+The proposed column array avoids that requirement. It is a separate array kind
+with no implicit conversions and no references, slices, or views into its
+elements. Its implementation needs storage handling and a few array members, at
+about a third of the full design's estimated size.
 
 ## Rules
 

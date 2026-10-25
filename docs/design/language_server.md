@@ -156,14 +156,13 @@ the process figures with `time`:
 | `samples/31_mini_doom.goose`, first run | | | | 15.3 s | | |
 | `samples/31_mini_doom.goose`, after | | | | 53 ms | | 75 ms |
 
-The 15 seconds are spent by the parse fetching the `gfx` package. The other
-figures show that a full re-analysis of a program the size of the
-self-hosted compiler takes a tenth of a second in-process, and of a typical
-program a hundredth, which is well inside the debounce an editor uses
-anyway (the extension waits 180 ms today). No incremental analysis is
-needed to start with, and the data structures (an append-only `Ast` per
-compile, freed as a whole) are suited to replacing the analysis rather than
-updating it.
+The 15 seconds are spent fetching the `gfx` package during parsing. The other
+measurements show that a full in-process analysis takes about a tenth of a
+second for a program the size of the self-hosted compiler, and a hundredth for a
+typical program. Both fit within the extension's current 180 ms debounce delay.
+Incremental analysis is therefore unnecessary for the first version. The
+append-only `Ast`, allocated per compile and freed as a whole, also makes it
+easy to replace a complete analysis.
 
 ## 3. Decisions
 
@@ -261,17 +260,22 @@ exception for a client that takes their refresh: the client asks for them
 again once the analysis is done. `$/cancelRequest` drops a request still
 in the queue.
 
-**An analysis.** An analysis of a root runs `ParseProgram` with a source
-provider that serves the overlay before the disk (§5 B) and with fetching
-off (§5 E), then `ResolveTypeNames`, `TypeCheckProgram` with `nomain`, and
-finally the optimizer and BCE for the `checkfree` errors (a fifth of the
-time; a setting can skip them). Each diagnostic is collected rather than
-thrown or printed (§5 C). Then the indexes are built. An analysis that was
-cancelled is discarded. If an analysis failed with a parse error before
-anything was annotated, the previous analysis is kept for queries and the
-new diagnostics are published. Diagnostics are published for every file
-of the root, open or not, as the extension does today, and cleared for
-files a root no longer reaches.
+**An analysis.** To analyze a root, the server runs these passes:
+
+1. `ParseProgram`, using the overlay before the disk (§5 B), with fetching
+   disabled (§5 E).
+
+2. `ResolveTypeNames`, then `TypeCheckProgram` with `nomain`.
+
+3. The optimizer and BCE, to report `checkfree` errors. These take a fifth of
+   the analysis time and can be skipped through a setting.
+
+Diagnostics are collected instead of thrown or printed (§5 C), then the indexes
+are built. A cancelled analysis is discarded. If a parse error stops analysis
+before any annotations are made, queries keep using the previous analysis while
+the server publishes the new diagnostics. As in the current extension,
+diagnostics cover every file reached from the root, whether open or closed.
+Diagnostics are cleared for files the root no longer reaches.
 
 **Roots.** `initialize` brings the configured entries for each workspace
 folder. A `didOpen` of a file that no analysis reaches makes the file a
@@ -293,18 +297,20 @@ the mark.
 In order of size, smallest first; each is useful on its own and testable
 without the protocol.
 
-**A. Positions.** `Line` gains `int col` (byte column, 1-based, as
-`FunVal::col` is), set in `Parser::CurLine` from `lex.attr.data() -
-lex.toklinestart`; `FunVal::col` is removed. `Field`, `Param`,
-`GenericParam`, `SVariant` and `Import` gain a `Line`. `VarDef` has one.
-Then come ends: the lexer records where the previous token ended
-(`prevend`), `Node` gains `int end` (a byte offset in the file, or an end
-line and column), and each parse function sets it on the node it returns
-(38 functions; a `Finish(node)` helper at their returns), as do the
-declaration parsers for `SFunction` and the types. The instantiation chain
-can then name a block by its `Line` alone, and a typecheck error can carry
-the node's whole range. A `Line` becomes twelve bytes instead of eight, in
-every node and type, which has no measurable cost.
+**A. Positions.** Add `int col` to `Line`: a 1-based byte column, as
+`FunVal::col` is today. Set it in `Parser::CurLine` from `lex.attr.data() -
+lex.toklinestart`, and remove `FunVal::col`. Add a `Line` to `Field`, `Param`,
+`GenericParam`, `SVariant`, and `Import`; `VarDef` already has one.
+
+Then record end positions. The lexer records the previous token's end in
+`prevend`. `Node` gains `int end`, either a byte offset in the file or an end
+line and column. Each of the 38 parse functions sets this on the node it
+returns, using a `Finish(node)` helper. The declaration parsers for `SFunction`
+and the types do the same.
+
+The instantiation chain can then identify a block by its `Line` alone, and a
+typecheck error can include the node's whole range. `Line` grows from eight to
+twelve bytes in every node and type, with no measurable cost.
 
 **B. A source provider.** `ParseProgram`'s `rootsource` becomes a
 `function<const string *(const string &path)>`, consulted for every file
@@ -672,19 +678,20 @@ these:
   a builtin given an opaque value, a type parameter called as a function
   value (`F(x)`), indexing, iterating or testing an opaque value.
 
-**The check.** The server sets `Ast::exemplars`; `goose check` never does.
-After the real roots and the whole-program fixups, every top-level
-function with type parameters or untyped parameters that no root
-specialized gets an exemplar. The exemplar is checked the way
-`CheckUnreached` checks a plain function that nothing reached (each
-reference, slice or holder parameter is rooted at a class of its own and
-is writable), but in a mode where errors are not reported: a
-`CompileError` or an `Abandoned` ends the exemplar silently and returns the
-checker to the root's entry, as `CheckRoot` does, and no warning is given.
-What the check annotated before the error is kept, so an exemplar covers
-the code up to the first thing the opaque types do not support. For a body
-that only moves its `T`s around, compares them and passes them on, that is
-the entire body.
+**The check.** The server sets `Ast::exemplars`; `goose check` never does. After
+checking real roots and applying whole-program fixups, it creates an exemplar
+for each top-level function that has type parameters or untyped parameters and
+was not specialized by any root.
+
+The exemplar is checked like an unreached plain function in `CheckUnreached`:
+each reference, slice, or holder parameter is writable and rooted at its own
+class. Errors are suppressed. A `CompileError` or an `Abandoned` silently ends
+the exemplar and restores the checker to the root's entry, as `CheckRoot` does.
+No warning is issued.
+
+Annotations made before the error are kept. An exemplar therefore covers the
+code up to the first operation its opaque types do not support. For a body that
+only moves, compares, and passes on its `T`s, this covers the entire body.
 
 **Isolation.** Exemplars run after everything that reports, so nothing they
 record reaches a fixup or a diagnostic. A call inside an exemplar does not
@@ -758,14 +765,14 @@ What the numbers mean, for the next person:
   is the costliest per request (it writes every name in scope with its
   detail), then semantic tokens. The slowest request the sweep ever saw
   was 15 ms, before the second fix below.
-* **First finding: a byte quoted on its own.** The lexer's "illegal
-  character" and "unknown escape sequence" messages quoted only one byte
-  of the character, so a multibyte character (a non-breaking space in a
-  comment whose `//` an edit had broken) put invalid UTF-8 in the
-  diagnostic and in the server's JSON, which a client that decodes UTF-8
-  strictly cannot read. The lexer now quotes the whole character with
-  its code point (`Utf8CharAt`, `QuotedCharAt`;
-  `errors_tc/recovery/lexer.goose` has one).
+* **First finding: a byte quoted on its own.** The lexer's "illegal character"
+  and "unknown escape sequence" messages quoted only one byte of a character. A
+  multibyte character therefore produced invalid UTF-8 in both the diagnostic
+  and the server's JSON, which strict UTF-8 clients could not read. The observed
+  case was a non-breaking space in a comment whose `//` had been broken by an
+  edit. The lexer now quotes the whole character with its code point
+  (`Utf8CharAt`, `QuotedCharAt`; `errors_tc/recovery/lexer.goose` has an
+  example).
 * **Second finding: the first request after an analysis waited for the
   last analysis to be freed.** Replacing a root's analysis destroyed the
   old `Ast` on the worker, after publishing. That took 6 ms for a ui

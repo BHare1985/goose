@@ -30,13 +30,12 @@ runtime opens the library when the program starts, under this backend as in
 a built program. Only a package or program with C of its own to compile
 needs one.
 
-Both modes use identical generated C for the program. Around it, the JIT run
-compiles the whole runtime in the same unit, in the form `--standalone`
-writes. By default, the file that `-o` writes instead declares most of the
-runtime extern, for linking with the object that `--emit-runtime` makes
-(`docs/implementation.md` §7). `-D` writes its define into that C rather
-than passing it to a backend, so a JIT run and a compiled one receive
-identical source text. `--` passes the arguments after it to the program.
+Both modes generate identical C for the program. A JIT run compiles the whole
+runtime in the same translation unit, using the form that `--standalone` writes.
+By default, `-o` instead declares most of the runtime extern. That output links
+with the runtime object produced by `--emit-runtime` (`docs/implementation.md`
+§7). `-D` writes a define into the C source, so both modes receive the same
+source text. `--` passes the remaining arguments to the program.
 
 The program shares the process: its exit status becomes the compiler's, its
 output goes to the same streams, and the compiler's own progress lines move

@@ -369,8 +369,7 @@ function is executing. Small helpers called from hot loops (`swap`, `min`,
 A function's entry facts come from its call sites (§10.5). A `checkfree`
 function relying on them can stop compiling when a new caller elsewhere
 fails to establish them. In that case the error names that call site and the
-fact it does not establish. The robust style does not rely on facts from
-callers:
+fact it does not establish. To keep a function independent of its callers, use:
 * index types in the signature;
 * entry `assert`s for the length relations the body needs, like
   `assert(dist.len >= nodes.len)`.

@@ -1,12 +1,11 @@
 # The documentation site
 
-The documentation is written as markdown that reads on GitHub, with
-relative links between the files as they lie in the repository. This
-directory turns the same files into a static site for GitHub Pages, with
-pandoc, keeping the repository's layout so that every link still works:
-`README.md` becomes `index.html`, `docs/tutorial.md` becomes
-`docs/tutorial.html`, `samples/README.md` becomes `samples/index.html`,
-and each sample program gets a highlighted page of its own.
+The documentation is Markdown that can be read on GitHub, with relative links
+between files. This directory uses pandoc to build those files into a static
+site for GitHub Pages. It preserves the repository layout so the links keep
+working: `README.md` becomes `index.html`, `docs/tutorial.md` becomes
+`docs/tutorial.html`, and `samples/README.md` becomes `samples/index.html`. Each
+sample program also gets its own page with syntax highlighting.
 
 ```bash
 python docs/site/build.py --out build/site --check

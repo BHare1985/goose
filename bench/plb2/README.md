@@ -161,11 +161,11 @@ have no measurable cost. Neither does the zero fill of the traversal stack,
 which the port does once per query and the C does not: a limited array
 (`StackCell[..64]`, pushed and popped, never filled) runs in the same time.
 
-plb2's Rust programs differ from its C in ways that matter to the numbers:
-`matmul` multiplies vectors of vectors through iterator zips, and `bedcov`
-generates one interval fewer per set (`1..n`) and sorts with the standard
-library's stable sort rather than a radix sort, so its output differs from
-the other two languages'.
+plb2's Rust programs differ from its C programs in ways that affect the results.
+`matmul` multiplies vectors of vectors through iterator zips. `bedcov` generates
+one interval fewer per set (`1..n`) and uses the standard library's stable sort
+instead of a radix sort. Its output therefore differs from the other two
+languages'.
 
 ## Compiler follow-ups
 

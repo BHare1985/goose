@@ -244,16 +244,17 @@ button. Program arguments still come from `goose.runArguments`.
 
 ## Verification
 
-`npm test` exercises the actual TextMate/Oniguruma grammar, declaration/import
-scanning, parsing of the compiler's JSON and text diagnostics (including
-Windows paths and UTF-8 byte columns), the fallback from `--diagnostics json`
-to text, task arguments, cancellation/stale-result handling, the language
-server's probe and setup, and the real server over its own protocol
-(diagnostics as the text changes, and a hover). Compiler integration tests
-run when a Goose build exists in the parent repository; set
-`GOOSE_TEST_COMPILER` to test another executable. Missing compilers are
-reported as skipped tests, as are the JSON test with a compiler that lacks the
-flag and the server test with one that lacks the verb.
+`npm test` covers the TextMate/Oniguruma grammar, declaration and import
+scanning, and parsing of JSON and text diagnostics, including Windows paths and
+UTF-8 byte columns. It also checks fallback from `--diagnostics json` to text,
+task arguments, cancellation, and handling of stale results. Language-server
+tests cover probing and setup, then use the real protocol to check diagnostics
+after text changes and a hover response.
+
+Compiler integration tests run when a Goose build exists in the parent
+repository. Set `GOOSE_TEST_COMPILER` to test another executable. A missing
+compiler is reported as a skip. So are JSON tests with a compiler that lacks the
+flag, and server tests with one that lacks the verb.
 
 For the editor integration suite, create an empty directory
 `build/goose-extension-fixture` in the parent repository, then select **Test Goose

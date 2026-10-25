@@ -65,13 +65,12 @@ input, or a fresh array built at the caller's destination. New nominal types
 are introduced only where the language has no representation to build on (a
 hash table) or the spec already asks for them (vectors).
 
-**Small.** The library has one well-chosen function per job, chosen so that
-the obvious call covers the common cases. There are no
-`_if`/`_by_key`/`_reverse`/`_indices` families. A candidate function is
-included only if the idiomatic hand-written loop is more than three lines,
-*or* the loop is easy to get subtly wrong (sorting, hashing, UTF-8, float
-printing, binary search). §9 lists what was left out and the one-line loop
-that replaces it.
+**Small.** The library provides one function per job, with a call that covers
+common uses. There are no `_if`/`_by_key`/`_reverse`/`_indices` families. A
+function is included only when the usual hand-written loop takes more than three
+lines or is easy to get wrong, as with sorting, hashing, UTF-8, float printing,
+and binary search. §9 lists omitted functions and the one-line loops that
+replace them.
 
 **Goose first, builtins by exception.** A builtin is justified only when it
 provides an operation the language cannot express: custom typechecking
@@ -89,16 +88,16 @@ hidden copies. The conventions in §2 are chosen so that the cheap call is
 the natural one to write and the expensive one cannot be written by
 accident.
 
-**Lobster's shape, Goose's cost model.** From Lobster's `std.lobster` we take
-the function-heavy surface, the `it` blocks, `find`/`filter`/`fold`/`map`,
-and `insert_ordered`-style pragmatism. We do not take the
-allocate-a-new-vector-per-call semantics (results are built in place) or the
-do-everything builtins (`tokenize`, `concat_string`), which become small
-composable pieces. From C++ and Rust we take the *coverage list* (sort,
-stable sort, binary search, heap, dedup, retain, hash map, string search),
-and reject the iterator protocols, trait bounds and wrapper types that those
-languages build it on. Goose has `T?` references, multiple returns and
-`return from` instead of `Option`, `Result` and exceptions.
+**Lobster's shape, Goose's cost model.** From Lobster's `std.lobster`, we take
+an API organized around functions, `it` blocks, `find`/`filter`/`fold`/`map`,
+and practical helpers such as `insert_ordered`. Results are built in place
+instead of allocating a new vector for each call. Broad builtins such as
+`tokenize` and `concat_string` are replaced by smaller functions that can be
+combined. C++ and Rust guide the list of operations to cover: sort, stable sort,
+binary search, heap, dedup, retain, hash map, and string search. Goose
+implements these without their iterator protocols, trait bounds, or wrapper
+types. It uses `T?` references, multiple returns, and `return from` in place of
+`Option`, `Result`, and exceptions.
 
 ---
 
@@ -348,7 +347,9 @@ word but the last gets a multiply and a rotate. The last word is the final
 word), and it gets two multiply-xorshift rounds, so that every input bit
 reaches the low 32 bits that `dictionary` masks and keeps as slot tags.
 Otherwise, keys that differ only in their last characters (`item_17`,
-`item_18`) would share their low bits. Each word's round has to wait for
+`item_18`) would share their low bits.
+
+Each word's round has to wait for
 the previous word's multiply. So for keys longer than 24 bytes, the words
 before the last 24 bytes or fewer are split over two lanes (the even and
 the odd words of each 16 bytes), and a processor can overlap the two lanes'
@@ -357,6 +358,7 @@ remaining words. This two-lane form is a separate function (`hash_lanes`),
 called from an early return, which the optimizer keeps out of line. That
 keeps the code for short keys small enough for the C compiler to inline
 into a dictionary's lookups.
+
 A user key type defines `fn hash(k: key) -> u64 { hash_combine(hash(k.a),
 hash(k.b)) }`. Fixed-capacity inline strings (`u8[..16]`) hash through the
 slice overload, which is what makes them usable as `dictionary` keys.
@@ -446,11 +448,15 @@ Lomuto loop (every element is swapped, and the boundary advances by the
 comparison's outcome). It then pushes the larger side onto an `i64[..144]`
 stack of (lo, hi, budget) ranges and continues with the smaller side. So
 the sort never recurses, allocates nothing, and holds at most log₂(2⁴⁸)
-ranges. Everything to the left of a range sorts before or equal to
+ranges.
+
+Everything to the left of a range sorts before or equal to
 everything in it. So when the pivot does not sort after the element just
 before the range, one pass moves the elements equal to the pivot to the
 front and drops them from the range, as pdqsort does. As a result, many
-equal keys take only linear passes. Each range carries a budget of
+equal keys take only linear passes.
+
+Each range carries a budget of
 2·log₂(n) rounds. When the budget runs out, heapsort finishes the range,
 which bounds the worst case at O(n log n). `test/stdlib/stdlib_sort.goose`
 checks this by using McIlroy's adversary to build an input that targets the
@@ -472,7 +478,9 @@ shorter than 16 by insertion sort. If the input is a single run, the sort
 ends there. The ends of the runs are stored in an `i64[>..]`. Each pass then
 merges neighboring pairs of runs between `xs` and a `T[>..]` temporary on a
 fresh data stack (a stack index, not an allocation). The passes alternate
-direction, so that no pass has to copy back. A merge of two runs that are
+direction, so that no pass has to copy back.
+
+A merge of two runs that are
 already in order just copies them. Otherwise each merge step either
 branches on the comparison or uses conditional moves to select the element
 and the side. A merge branches when the previous merge switched between its
@@ -696,9 +704,8 @@ fn is_inf(x: f64) -> bool
 `floor`/`ceil`/`round`/`trunc` return floats, as in C; `as i64` converts.
 Float `%` is already `fmod` (§6.1).
 
-`os` is a thin, deliberately incomplete layer over C functions in
-`src/runtime/runtime_os.h`. It provides enough to write tools and
-benchmarks:
+`os` wraps a limited set of C functions in `src/runtime/runtime_os.h`, enough to
+write tools and benchmarks:
 
 ```goose
 fn read_file(path: u8[:], out: u8[>..]&) -> bool     // appends the whole file
@@ -874,10 +881,9 @@ a match binder or a queue put:
   slice or other conversion, a local being returned) or an explicit
   `copy(x)`. `copy` is a builtin that constructs the copy at the destination
   (§4.3 semantics), and it is an explicit marker that is easy to search for.
-* This makes `&` at call sites redundant rather than required. A redundant
-  `&` (one written at a source whose reference-typed destination would have
-  bound it anyway) is a warning, so that code in the language keeps one
-  style instead of a scattering of leftover `&`.
+* `&` at call sites becomes optional. If the reference-typed destination would
+  already bind the source, writing `&` produces a warning. This encourages a
+  consistent calling style.
 
 The rule applies to individual constructs as follows:
 

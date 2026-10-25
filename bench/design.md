@@ -62,11 +62,11 @@ algorithm runs with at least 3 different data sizes: the smallest one focuses on
 CPU, and the 2 bigger sizes stress the cache and memory subsystems increasingly, to
 see if the Goose advantage appears or widens.
 
-We will want to test all reasonably idiomatic forms per language, e.g. for an
-algorithm that works on variant/polymorphic data, for Goose we'll want to see
-both fixed and variable enums if possible, for Rust just fixed enums, and for
-C++ we'll want to compare subclasses (most idiomatic but slow), std::variant
-(faster but unergonomic) and C-style unions (fastest, but very unsafe).
+We should test all reasonably idiomatic forms in each language. For an algorithm
+that uses variant or polymorphic data, compare Goose's fixed and variable enums
+where possible, and Rust's fixed enums. For C++, compare subclasses (most
+idiomatic but slow), std::variant (faster but awkward to use), and C-style
+unions (fastest, but very unsafe).
 
 If an algorithm does a lot of resizable array pushing, we'll want to be
 fair to C++ and compare both what happens if the programmer optimally
@@ -207,16 +207,14 @@ been implemented with validation (see `docs/design/serialization.md`). Queues
 can carry the serialized byte image, but cannot directly carry values with
 relative references because those values are not flat (TODO 9).
 
-C++ is measured at two tiers, idiomatic and expert, because the language admits
-such a wide range of implementation techniques that one row would
-misrepresent it. For Rust, the benchmarks compare safe, idiomatic
-implementations. Where a benchmark has two idiomatic Rust representations
-they are both listed, but the reason is always a semantic difference (owned
-versus borrowed strings) or a structural one (owning `Box` nodes versus the
-`Vec`-plus-indices arena the community recommends for pointer-heavy data), never
-only that one is faster. The prediction made above, that the arena rather than
-`Box` is the real Rust comparison point, held: the arena is 2.8x to 5.9x faster
-than `Box` on the three benchmarks that have both.
+C++ is measured at two tiers, idiomatic and expert. Its range of implementation
+techniques is too wide for one row to represent it. For Rust, the benchmarks
+compare safe, idiomatic implementations. When two Rust representations are
+listed, they differ in semantics or structure: owned versus borrowed strings,
+for example, or owning `Box` nodes versus a `Vec`-plus-indices arena. A faster
+time alone is not a reason to include another representation. The community
+recommends the arena for pointer-heavy data, and the prediction above held: it
+is 2.8x to 5.9x faster than `Box` on the three benchmarks that have both.
 
 The comparison also has a usability dimension that timing does not measure:
 when Rust uses `u32` indices and Goose uses typed, nullable references, similar

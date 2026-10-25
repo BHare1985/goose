@@ -590,15 +590,15 @@ has the configuration for Neovim, Helix and Emacs.
   order, from a tour of the language to a JSON parser, a threaded Mandelbrot, a
   file tree built from two pools, a spinning cube on the GPU, thousands of
   boxes raining into a heap and a to-do list in windows of widgets.
-* [Standard library](docs/stdlib.md): fourteen modules, all written in
-  readable Goose under `stdlib/`. They include `gfx`, graphics on SDL3's GPU
-  API ([how it is built](https://github.com/aardappel/goose_gfx/blob/main/docs/gfx.md));
-  `physics`, rigid body physics on Box3D
-  ([how it is built](https://github.com/aardappel/goose_physics/blob/main/docs/physics.md));
-  and `ui`, which provides fonts,
-  [text rendering and game HUDs](docs/stdlib.md#text-rendering-and-game-huds),
-  and windows and widgets on Nuklear, drawn through gfx
-  ([how it is built](https://github.com/aardappel/goose_gfx/blob/main/docs/ui.md)).
+* [Standard library](docs/stdlib.md): fourteen modules, all written in readable
+  Goose under `stdlib/`. They include `gfx` for graphics on SDL3's GPU API ([how
+  it is built](https://github.com/aardappel/goose_gfx/blob/main/docs/gfx.md))
+  and `physics` for rigid body physics on Box3D ([how it is
+  built](https://github.com/aardappel/goose_physics/blob/main/docs/physics.md)).
+  The `ui` module provides fonts, [text rendering and game
+  HUDs](docs/stdlib.md#text-rendering-and-game-huds). It also provides windows
+  and widgets on Nuklear, drawn through gfx ([how it is
+  built](https://github.com/aardappel/goose_gfx/blob/main/docs/ui.md)).
 * [Building programs and using packages](docs/packages.md): `goose build`,
   libraries from git repositories or directories, a program's own C, and
   how to make a package of your own.

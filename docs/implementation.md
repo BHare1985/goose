@@ -350,15 +350,15 @@ first token, with two exceptions: a binary expression, assignment, index,
 field access or cast is anchored at its operator, and a call is anchored
 at its callee. Diagnostics name the anchor's line.
 
-A diagnostic is built as data before it becomes text (`Diagnostic`,
-`utils.h`). The data is its severity, its message, its place (`DiagLoc`:
-the file, and where the diagnostic starts and ends; for a node, this runs
-from the earliest token the node has on its anchor's line to the node's
-end, `LocOf`), and the related lines after the message (the instantiation
-chain, `TypeCheck::InstantiationChain`, each at the call it names).
-`RenderDiagnostic` makes the text the terminal shows: the head
-`file:line: error: message`, the echoed source line (for an error; for a
-lexer error, with a caret under its column), and the related lines.
+A diagnostic is built as data before it is rendered as text (`Diagnostic`,
+`utils.h`). It contains a severity, message, location, and related lines. The
+location (`DiagLoc`) records the file and the diagnostic's start and end. For a
+node, `LocOf` starts at its earliest token on the anchor's line and ends at the
+node's end. The related lines show the instantiation chain
+(`TypeCheck::InstantiationChain`), with each entry located at the call it names.
+`RenderDiagnostic` produces the terminal output: `file:line: error: message`,
+the source line for an error, and the related lines. Lexer errors also get a
+caret under their column.
 
 A `CompileError` carries both the text and the data (several diagnostics
 for a `checkfree` function's kept checks, `BCE::CheckfreeError`), and ends
@@ -465,32 +465,31 @@ ANDed over every call site that reaches the specialization, and only codegen
 specialization still being checked (`inprogress`) reuses it regardless of
 its roots (§3.11).
 
-`CheckSpecBody` checks one body. It pushes a `Frame` (the function, its
-specialization, the lexical specialization and frame index used for free
-variable lookup, the call line for diagnostics), creates the parameter
-`VarDef`s with their synthetic class roots, records or infers the return
-types, seeds the cycle return roots where the function is `recursive`,
-clones the body, checks its statements, and treats a value-producing tail as
-`return tail`. Per-body state is saved on entry and restored on exit: pending shrinks,
-held temporaries, reachability, the construction
-destination, the slot and return flags (§3.8), and narrowings of outer
-variables. The outer variables the body assigns are left assigned where
-all of its exits agree, and maybe assigned where any of its exits may
-assign them (§3.9). Only the specialization's effect summaries reach the
-caller.
+`CheckSpecBody` checks one body. It first pushes a `Frame` containing the
+function, specialization, lexical specialization, frame index for free-variable
+lookup, and call line for diagnostics. It then creates parameter `VarDef`s with
+synthetic class roots and records or infers the return types. For a `recursive`
+function, it seeds the cycle return roots. Finally, it clones the body, checks
+its statements, and treats a value-producing tail as `return tail`.
+
+Per-body state is saved on entry and restored on exit: pending shrinks, held
+temporaries, reachability, construction destination, slot and return flags
+(§3.8), and narrowings of outer variables. Outer variables assigned by the body
+remain assigned if all exits agree, and maybe assigned if any exit may assign
+them (§3.9). Only the specialization's effect summaries reach the caller.
 
 **Broken bodies.** A function whose body lost a statement in the parser,
 or that holds an incomplete `.` (`SFunction::broken`, §2), is checked up
 to that point. `CheckStmts` throws `Abandoned` (`utils.h`) at the lost
 statement (`Block::brokenat`), and `IncompleteDot` throws it after
-checking the object of the `.`, for the type a completion asks for. For a
-broken function's body, `CheckSpecBodyOnce` catches the exception, closes
-whatever the check had opened by then (the frames, scopes, variables and
-nested functions beyond its own, and the type build in progress), and
-finishes the specialization from the signature: the specialization may
-return, its results are rooted at no place a rule reads
-(`Roots::unknown`, the most permissive), and the named-result checks are
-skipped. So a call of a broken function is checked against its signature
+checking the object of the `.`, for the type a completion asks for. For a broken
+function's body, `CheckSpecBodyOnce` catches the exception and
+closes the state opened during checking: frames, scopes, variables and nested
+functions beyond its own, and the type build in progress. It finishes the
+specialization from the signature. The specialization may return, its results
+use the most permissive roots (`Roots::unknown`, which no rule reads as a
+location), and named-result checks are skipped. So a call of a broken function
+is checked against its signature
 alone, as a call of an extern function is, and the caller's check
 continues. A function with no declared results returns none. Nothing is
 reported, since the parser already reported the error. A body broken
@@ -686,12 +685,13 @@ related entries (§2), at the call it names.
 
 ### 3.2 Types, instantiation, and size classes
 
-`TypeExpr` (`ast.h`) is a kind plus a per-kind detail; the `cq` bit is the
-`const` qualifier of §9.5 and is part of type identity (`TypeEq`), except
-where a parameter or result is compared (`TopConstEq`: constness of the
-type itself is inferred per instantiation, constness nested deeper is part
-of the type) and where a value other than a reference or slice is stored
-whole (`FitsAt`: the slot's type says whether its contents are read-only).
+`TypeExpr` (`ast.h`) contains a kind and details specific to that kind. Its
+`cq` bit represents the `const` qualifier (§9.5) and normally participates in
+type identity (`TypeEq`). There are two exceptions. When comparing parameters
+or results, `TopConstEq` infers top-level constness per instantiation; deeper
+constness remains part of the type. When storing a whole value other than a
+reference or slice, `FitsAt` uses the slot's type to determine whether the
+contents are read-only.
 `Subst` substitutes generic names through the lexical binding chain
 (`LookupBinding`: the current specialization, then its lexical parents).
 It collapses a reference built on a type argument that is itself a
@@ -707,13 +707,13 @@ type once per argument list (cached on the `TypeStruct`/`TypeEnum` detail
 and searched by argument equality for clones), substitute the field types,
 validate them, and compute the derived properties every later pass reads:
 
-* the **size class** (`ClassOf`): a resizable field is allowed only as the
-  final field, with no padding after it either (the same holds for a
-  payload's resizable field), and makes the struct resizable; any
-  variable-class part makes it variable; `varint` fields and varint-width
-  relative references are variable-class; a limited array is fixed with a
-  static capacity and variable with `[..]`; a fixed-mode enum is fixed,
-  and a variable-mode one's class is its `varclass`;
+* the **size class** (`ClassOf`). A resizable field must be last, with no
+  padding after it, and makes the struct resizable. This also applies to a
+  payload's resizable field. Any variable-class part makes the type
+  variable-class; `varint` fields and varint-width relative references are
+  variable-class. A limited array is fixed with a static capacity and variable
+  with `[..]`. A fixed-mode enum is fixed; a variable-mode enum uses its
+  `varclass`;
 * `flat` (no references anywhere), what threads and queues require;
 * `frameobj` (C.2): a resizable-tailed struct whose other fields are all
   fixed-size and free of relative references, and whose tail is an array or
@@ -798,12 +798,12 @@ for an array, its holder root, as a copy of the whole array has; for a
 slice or reference, each element as `ContainerRead` reads it out of the
 storage viewed.
 
-**Pending arrays.** `var out = [];` (§4.2) gets a grow-only array type whose
-element is a private void type (`PendingArray`); the first `push`, `append`,
-`format` or whole assignment overwrites the element type *in place*
-(`CompletePending`), which completes it in the `VarDef`, in every `Ident`
-already checked and in the literal, since all of them share a single type
-object. A pending array that reaches a scope exit uncompleted is an error.
+**Pending arrays.** `var out = [];` (§4.2) gets a grow-only array type with a
+private void element type (`PendingArray`). The first `push`, `append`,
+`format`, or whole assignment replaces that element type *in place*
+(`CompletePending`). The `VarDef`, previously checked `Ident`s, and literal
+all share this type object, so the update completes all of them. A pending array
+that reaches a scope exit uncompleted is an error.
 The pending array of a `reusable` declaration (`pendingpools`) takes only a
 fixed-size element from whatever completes it, as `CheckVarDecl` requires of
 an annotated pool (§5.4).
@@ -900,12 +900,20 @@ function's body was first checked inside the default or before it.
 
 ### 3.3 Values, lvalues, and reference transparency
 
-Every `Check` returns a `Val` (`ast.h`): the type, the constant value where
-the expression folds, the literal flags (`strlit`, `emptyarr`, `isnull`,
-`unsized`), `lvalue` (denotes storage), `nonneg` (§3.14), the holder fields
-(§3.5), what a control construct's branches are (`storagebranches`,
-`implicitcopy`, §3.12; `joinslice` and its companions, §3.4), and a
-`Prov` (the provenance of §3.4).
+Every `Check` returns a `Val` (`ast.h`) containing:
+
+* The type and, if the expression folds, its constant value.
+
+* Literal flags: `strlit`, `emptyarr`, `isnull`, and `unsized`.
+
+* `lvalue`, which says whether the value denotes storage, and `nonneg` (§3.14).
+
+* Holder fields (§3.5).
+
+* Branch information for control constructs: `storagebranches` and
+  `implicitcopy` (§3.12), plus `joinslice` and its companions (§3.4).
+
+* A `Prov` recording provenance (§3.4).
 
 References are transparent (§3.8), and the checker implements this as
 *decay*. `CheckV` is the raw per-node check, whose result may still denote
@@ -1199,12 +1207,12 @@ anywhere by that agreement, as a branch of an `if` would not be.
 branches, a reference variable's bindings before and after a rebind to
 another root at its depth, `CheckRefRebindRoot`, or the roots a call's
 callee returns, `CallResult`) has the union of their alternatives
-(`Roots::Add`). Two alternatives never share a root. An alternative added
-for a root that is already present keeps the weaker exactness, and names a
-container it was read out of (`RootAlt::from`, §3.6) only where both
-alternatives came out of that container: a reference into a parameter's
-storage, merged with one read out of that storage, may be either, and no
-store record says what the first is. A literal's references
+(`Roots::Add`). Two alternatives never share a root. When an alternative is
+added for an existing root, the merge keeps the weaker
+exactness. It retains the source container (`RootAlt::from`, §3.6) only if
+both alternatives were read from that container. For example, merging a
+reference into a parameter's storage with a reference read out of that storage
+can yield either. The store record describes only the second. A literal's references
 (`NoteLitElem`) and a container's contents (`VarDef::contents`) are united
 the same way. The rules that ask what storage a root *is* (the grow-shrink
 store rule, §3.5 rule 3, `GrowShrinkTaint`, and the cycle store rule, rule
@@ -1874,11 +1882,12 @@ call maps it to (§3.5).
 ### 3.8 Writability
 
 `const` is the `cq` bit on the type (§9.5); writability of a *value* is the
-`writable` provenance bit. The checker keeps the two consistent at slots:
-`constslot` (set by `SlotScope` for fields, elements, annotated variables,
-assignment targets and literal initializers; cleared for calls, their
-overload resolution included, and returns) makes `FitsAt` reject a
-read-only reference or slice landing in a slot whose type is not `const`.
+`writable` provenance bit. The checker keeps these consistent at slots through
+`constslot`. `SlotScope`
+sets it for fields, elements, annotated variables, assignment targets, and
+literal initializers. It is cleared for calls (including overload resolution)
+and returns. When set, it makes `FitsAt` reject a read-only reference or slice
+stored in a slot whose type is not `const`.
 What is read out of a slot is therefore as writable as the slot's type says
 (`ContainerRead`), and parameters and results are generic over constness:
 `RootArg::writable` is part of the specialization key, so a function given
@@ -1958,12 +1967,13 @@ otherwise write (spec §3.6).
 ### 3.9 Flow state: definite assignment and narrowing
 
 Each `VarDef` carries `assigned`, `maybeassigned` and `narrowed` (the `T&`
-type an optional is narrowed to). `SaveFlow`/`RestoreFlow`/`MergeFlow`
-snapshot and join them at every branch, for the variables the code between
-can name: those of the current frame, of the frames it is lexically nested
-in, and of the frames the function values it can call were written in
-(`NamedFrames`), and the globals, since no other frame's variables can
-change meanwhile. A fact holds after a join iff it holds in every reachable
+type an optional is narrowed to). `SaveFlow`/`RestoreFlow`/`MergeFlow` snapshot
+and join these facts at every
+branch. They cover all variables that the intervening code can name: globals,
+variables in the current frame and its lexical parents, and variables in the
+frames where callable function values were written (`NamedFrames`). No other
+frame's variables can change during that code. A fact holds after a join iff it
+holds in every reachable
 branch, and a variable is maybe assigned iff it is maybe assigned in some
 reachable branch. `reachable` tracks divergence (`return`, `break`,
 `continue`, `abort`, `exit`, and calls proven not to resume their caller).
@@ -2158,12 +2168,12 @@ one (`CheckAssign`, or `PointeeAssign` through a reference, with
    inexact) may be any array its pointee fits. A store through a reference
    into a global slice variable's slot is both an event on the variable and
    its binding (§3.5);
-6. the shrink is recorded for the callers (`NoteShrink`: `shrinkexternals`
-   for globals and captured locals, `shrinkparams` for parameters), and so
-   are the views still used that only the callers can tell apart from the
-   array (`NoteLiveViews`, **Parameters' views** below), and it is logged
-   for the values under construction around it (`NoteShrinkEvent`,
-   **Growth during construction** below).
+6. The shrink is recorded for callers by `NoteShrink`, using `shrinkexternals`
+   for globals and captured locals, and `shrinkparams` for parameters.
+   `NoteLiveViews` also records still-used views that only callers can
+   distinguish from the array (**Parameters' views** below). `NoteShrinkEvent`
+   logs the shrink for surrounding values under construction (**Growth during
+   construction** below).
 
 Inside a loop, a store later in the body than the shrink (a callee's store
 included) is on record when the body is checked again (`CheckLoopPasses`,
@@ -2301,13 +2311,14 @@ where its name occurs:
 * in a later statement of an open block at or inside its scope, or in that
   block's tail;
 * anywhere in an enclosing loop it was declared outside of;
-* in a part of its own statement not yet evaluated (`LaterOperands`, §3.3):
-  a whole assignment's right-hand side, a call's later arguments, a
-  literal's later fields, the arguments print, str and format render after
-  the one being checked (**Format overloads** below), and, where the shrink
-  is in the head of a construct on the path (an `if`'s condition, a
-  `match`'s scrutinee, a `for`'s sequence), the parts that head leads to
-  (`AfterHead`; an else-if is on the path of its own for this).
+* in a part of its own statement that has not yet been evaluated
+  (`LaterOperands`, §3.3). This includes a whole assignment's right-hand side, a
+  call's later arguments, a literal's later fields, and the arguments that
+  print, str, and format will render after the current one (**Format overloads**
+  below). If the shrink occurs in a construct's head on the path, the scan also
+  covers the code that head leads to (`AfterHead`). Such heads include an `if`
+  condition, a `match` scrutinee, and a `for` sequence; an else-if has its own
+  path for this purpose.
 
 A `for` binding is always live. `MentionsName` follows calls of nested
 functions by name into their bodies. The body of a function value being
@@ -2624,12 +2635,13 @@ one that changed a record judges every call with the settled balances.
 
 **Format overloads** (§3.7). print, str and format check their arguments in
 order (`CheckPrintable`): each one's value, then its rendering
-(`CheckRenderable`). The rendering specializes the user `format` overload
-of each type it meets with that part's roots and permissions, and with the
-builder (the format call's receiver where the text lands in it, else a
-temporary), and applies it as a call there (`UserFormatIn`:
-`ApplyCalleeShrinks`, `ApplyCalleeRebinds`, `ApplyCalleeGrows`, and
-`NoteWritableRef` for a variable taken whole by a writable reference).
+(`CheckRenderable`). For each type encountered during rendering, the checker
+specializes its user
+`format` overload with that part's roots and permissions. The builder is the
+format call's receiver if the text is written there, or a temporary otherwise.
+`UserFormatIn` applies the overload as a call using `ApplyCalleeShrinks`,
+`ApplyCalleeRebinds`, and `ApplyCalleeGrows`. It also uses `NoteWritableRef`
+when a variable is taken whole by a writable reference.
 Codegen evaluates each argument just before rendering it (`EmitFormatInto`,
 `EmitStr`), so while argument i is checked the ones after it are later
 operands (`LaterOperands`). A shrink in its evaluation (a call) or its
@@ -3827,11 +3839,12 @@ there a rebind narrows them instead, since the rebind settles what calls
 could pass.
 
 `free_slice` and `realloc_slice` use `index_of`'s exact-root test
-(`RootedAtReceiver`) only to leave out a run-time test. A slice that the
-test does not place in the pool is an error when it is rooted exactly at a
-global or a variable of the checked function that the receiver cannot be,
-because every alternative the receiver has is another such global or
-variable (a loop leaves that verdict to its settled pass, §3.7).
+(`RootedAtReceiver`) only to leave out a run-time test. If the test cannot place
+the slice in the pool, the checker may still prove
+that it belongs elsewhere. It reports an error when the slice is rooted
+exactly at a global or a variable of the checked function, and every receiver
+alternative names a different such global or variable. Loops defer this
+decision to their settled pass (§3.7).
 Otherwise the call sets `Call::poolcheck`, which codegen turns into a
 range test. `alloc_slice` and `realloc_slice` need an element type with a
 default value, and `realloc_slice` also needs one without self-relative
@@ -4183,13 +4196,13 @@ callee was handed or a nested function captures, is not followed. The
 `var t = ...; if c { t op=
 self(x) } t` form is restated as a return first (`AccVarForm`).
 
-**Min/max regrouping** (`Reassociator`, `optimize_reassoc.h`, `-O1` and
-above) applies to a chain of nested calls of one specialization shaped
-like std's `min` or `max` (`if x < y { return x; } return y;`, or
-returning `y` first) over an integer type, inside a loop, where an operand
-reads a variable that the innermost loop writes (assigns, writes an
-element or field of, or takes `&` of) and that is declared outside that
-loop. Such an operand usually carries the previous iteration's result, as
+**Min/max regrouping** (`Reassociator`, `optimize_reassoc.h`, `-O1` and above)
+applies inside loops to nested integer calls of one specialization shaped like
+std's `min` or `max`: `if x < y { return x; } return y;`, or returning `y`
+first. An operand must read a variable declared outside the innermost loop.
+That loop must assign the variable, write one of its elements or fields, or
+take its address with `&`. Such an operand usually carries the previous
+iteration's result, as
 the insertion cost of an edit distance does. The C compiler keeps the
 chain grouped as written, so every comparison the operand passes through
 is a compare and a conditional move on the loop's critical path.
@@ -4391,11 +4404,10 @@ storage, but two references in distinct classes are known to be distinct. A
 reference in one of the body's own parameter classes was formed by the
 body's caller before the body ran, so it names no storage of a variable the
 body declares (`HandedApart`).
-A slice's length is held in the slot the slice lies in (a variable, a
-field or an element), so a place reached through a reference to a slice is
-owned by the slot the reference is rooted at (§3.4): `UltOf`'s slot mode
-stops at a slice variable rather than following it on to the array it
-views.
+A slice stores its length in its slot, which may be a variable, field, or
+element. A place reached through a reference-to-slice is therefore owned by
+the slot at which that reference is rooted (§3.4). In slot mode, `UltOf` stops
+at the slice variable instead of following it to the viewed array.
 Storage is **reachable** to a callee or an unknown reference only if its
 owner is a global, is captured, or has its address taken (`Reach`), since
 creating any reference into a variable requires one of those.
@@ -4649,11 +4661,12 @@ judged in the state it was evaluated in. It also records the slice's length
 as `hi - lo` when the domain can name it (both bounds on one base, or a
 constant lower bound); the declaration binding the slice then takes that
 length (`slicelen`). Codegen separately elides a constant index into a
-fixed array (`IndexLoc`). It also merges the checks that an `if`'s two arms
-start with, when they test the same index (a variable or a constant)
-against the same array (a variable or a field path of one) and the arm
-evaluates nothing before the check, as when the arm's first statement
-assigns through that element (`LeadingCheck`, `SameCheck`). One check then
+fixed array (`IndexLoc`). It also merges leading checks in the two arms of an
+`if` (`LeadingCheck`,
+`SameCheck`). Both checks must test the same index, a variable or constant,
+against the same array, a variable or field path. Neither arm may evaluate
+anything before its check. An assignment through the element as each arm's
+first statement is one example. One check then
 runs after the condition, ahead of the branch, and reports the location of
 the arm the condition selects (`EmitHoistedCheck`), so it fails exactly
 where either arm's check would have. The arms' addresses are then
@@ -4966,10 +4979,11 @@ uses a typed output pointer. Returns, forwarding and case dispatch pass
 that pointer through; a stack receiver claims the fixed slot and supplies
 its address (`ConstructCall`). A block gets the same lvalue destination.
 
-A slice, a fat reference and a pool's `gs_pref`, as a declared parameter or
-a captured pool, are passed as their members (`ParamFields`), each as a C
-parameter of its own: `data` (as `void *`) and `len` for a slice, `hdr` and
-`stk` for a fat reference, and those two plus `fl` and `flstk` for a pool.
+Slices, fat references, and a pool's `gs_pref` are passed member by member
+(`ParamFields`), whether declared as parameters or passed as captured pools.
+Each member becomes its own C parameter: `data` (as `void *`) and `len` for a
+slice; `hdr` and `stk` for a fat reference; and `hdr`, `stk`, `fl`, and
+`flstk` for a pool.
 The body's opening lines put the members back together into a local of the
 struct's type, under the parameter's name (`paramcopies`). Every caller
 passes each member of its argument's temporary (`PushArg`). In the Windows
@@ -5310,11 +5324,12 @@ null unless the value is a plain `T&`: a node of that type, a call declared
 to return one, or a block or `if` all of whose values are one
 (`RelValue`). Into a self-relative optional slot, the store aborts on a
 non-null target at offset zero (§3.9), unless no target can be at the
-slot's own address. That is the case when the slot is a field of a fixed
-struct at a nonzero offset and points at no reference: a target starting
-at the slot would have to be a part of the struct starting there, and the
-only such part is the slot itself (`RelSlotApart`; known from the
-assignment's field path or the literal's own layout).
+slot's own address. That exception applies when the slot is a field at a nonzero
+offset in a fixed
+struct and does not point at a reference. A target at the slot's address would
+have to be a part of the struct starting there, and the slot itself is the
+only such part. `RelSlotApart` establishes this from the assignment's field
+path or the literal's layout.
 
 Whatever produces the value, the store encodes a plain reference. A
 branch's or an inlined body's value for a relative slot is computed into a
@@ -5825,13 +5840,13 @@ What qualifies is defined over the operand's tree, which may have at most
 * inlined calls and blocks made of scalar `let`s and a value of the same
   kinds.
 
-Everything else keeps the short circuit: calls, writes, division (a zero
-check), signed arithmetic and narrowing casts (whose debug builds check
-overflow and range), float-to-integer casts, loads through an optional
-reference (the left operand may be what narrows it, §3.8), fields of
-variable-size structs, and any index that BCE did not settle that way,
-since the left operand is often what keeps it in bounds
-(`i < n && a[i] == c`).
+All other expressions keep short-circuit evaluation. These include calls,
+writes, division (which checks for zero), signed arithmetic and narrowing casts
+(which check overflow and range in debug builds), and float-to-integer casts.
+Loads through an optional reference also keep it, since the left operand may
+narrow that reference (§3.8). So do fields of variable-size structs and any
+index that BCE did not prove safe in this way. The left operand often supplies
+the bound, as in `i < n && a[i] == c`.
 
 ### 6.12 Restated loops
 
@@ -5841,9 +5856,10 @@ starts with a comment naming its shape (`/* loop shape: ... */`), which the
 test runner reads in `test/optimizer/loop_shapes.goose`'s C.
 
 **Blocks of iterations** (`GenBlocked`). This applies to a `for` marked
-`stripk` or `sumred` whose iteration count is fixed at entry: a range or a
-count, or an array or slice with `fixedlen` or a fixed array, walked where
-it lies, and not one that BCE bounds shorter than two blocks. Such a loop
+`stripk` or `sumred` with an iteration count fixed at entry. Eligible
+sequences are ranges, counts, fixed arrays, and arrays or slices with
+`fixedlen`. Arrays and slices must be walked in place. BCE must not have
+bounded the loop to fewer than two blocks. Such a loop
 runs `while (at least K left) { K iterations }`, and then runs the rest one
 iteration at a time in a loop of its own; each of the two loops runs a copy
 of the body. Neither copy re-reads a length that the body cannot change,
@@ -5855,14 +5871,18 @@ either copy leaves both, and a `continue` reaches the end of the copy it is
 in, whose step advances the counter. Both copies divide by the magic number
 of a divisor fixed for the loop (§6.10's divisors), and both take `&&` and
 `||` in the unconditional form where the body can be straight-line code
-(§6.11). Measured with clang-cl 22 at `/O2` over a million elements, a
+(§6.11).
+
+Measured with clang-cl 22 at `/O2` over a million elements, a
 strip-mined loop adding `x / d` into 4 lanes ran 4.4 times as fast with the
 magic number as with the division. An in-order sum of
 `if x > lo && x < hi { x } else { 0.0 }` ran 8 times as fast in the
 unconditional form. clang's choice between a select and a branch for such a
 term is fickle, though: a sum of byte compares that ran 2.9 times as fast
 on its own ran 1.5 times as slow when inlined into each copy of a
-strip-mined loop around it, where clang branched on each compare again. A
+strip-mined loop around it, where clang branched on each compare again.
+
+A
 body is emitted twice only where nothing binds to its locals once per
 function (`Dupable`). That is, the body declares no data-stack local, no
 captured local, no named result built at the destination, no nested
@@ -6013,7 +6033,9 @@ bytes (default 2 GB, capped at 2^48 by §10.4) plus an unmapped tail of
 them to the runtime as the program starts. The runtime rounds the
 reservation down to whole pages: the gap has to start on a page boundary to
 be protected, and on Windows a stack would otherwise grow unnoticed through
-the rest of a partial page committed at its end. On Windows, pages are
+the rest of a partial page committed at its end.
+
+On Windows, pages are
 committed on fault by a vectored handler that tells a commit from an
 overrun. When the system refuses a commit (because its commit limit is
 reached), the handler reports it as out of memory. macOS also commits on
@@ -6024,7 +6046,9 @@ the gap. Runtime C therefore writes to a stack only in user mode (`memcpy`,
 `gs_bld_append`) and never through a system call, because a system call
 would fail on an unopened page instead of faulting. A debugger sees each
 such fault first (lldb stops on its `EXC_BAD_ACCESS` unless it is passed on
-to the program). If the platform refuses a region (because its address
+to the program).
+
+If the platform refuses a region (because its address
 space, an address-space limit or strict overcommit accounting is exhausted),
 the runtime retries at half the size, in whole pages, down to 1 MB, and
 every region reserved after that starts out that much smaller
@@ -6034,7 +6058,9 @@ and the guard gap behind a smaller region only aborts growth sooner. Each
 region therefore carries its own sizes for the fault handler. An overrun
 ends the program with a message that names the thread program, the region's
 size and the flag that raises that size. The message is written without
-stdio, since a signal handler may not call stdio. A thread program's stacks
+stdio, since a signal handler may not call stdio.
+
+A thread program's stacks
 are kept in a block reached through the thread-local `gs_stks`. Since the
 compiler knows how many there are, all of them are reserved as the thread
 program starts (`gs_stack_block`, called from `gs_rt_init` for main and from
@@ -6373,15 +6399,22 @@ call sites*. In practice:
   loop head (std's `heap_pop` keeps these checks; they have no measurable
   cost).
 
-Practical consequences: state facts with `assert` where the compiler cannot
-see them (`assert(a.len == n)` at a function's entry when its callers are
-opaque); keep indices in `i64` locals derived from counters and lengths
-rather than `u64` or loaded values; write image and matrix kernels either as
-row slices or as `y * W + x` against a length the caller states; and use
-`--bce-lines` to see which lines kept their checks. On MSVC a kept check
-inside a hot loop prevents vectorization entirely (`blur` is 1.75x slower
-with its nine checks). On clang the checks cost little, and the loop-view
-hoist below is what matters.
+To help the compiler remove bounds checks:
+
+* State facts with `assert` when the compiler cannot see them. For example, use
+  `assert(a.len == n)` at a function's entry when its callers are opaque.
+
+* Keep indices in `i64` locals derived from counters and lengths, rather than in
+  `u64` locals or values loaded from storage.
+
+* Write image and matrix kernels using row slices, or use `y * W + x` with a
+  length stated by the caller.
+
+* Use `--bce-lines` to find lines that retain checks.
+
+On MSVC, a retained check in a hot loop prevents vectorization entirely: `blur`
+is 1.75x slower with its nine checks. On clang, the checks cost little; the
+loop-view hoist described below matters more.
 
 ### 9.2 Arrays behind references
 
@@ -7096,13 +7129,14 @@ next analysis can run meanwhile; the thread is joined when the server exits.
 **Analysis** (`lsp_analysis.h`). An analysis is the `Ast` as the check left
 it, together with the indexes the features read. `FileIndex::occs` holds
 every occurrence of a name in a file, by start offset, found by walking
-every declaration and body once. An occurrence is either a use (`IDENT`,
-`DOT` for a member, `TYPE` for a type name, `INIT` for a field named in a
-struct literal, each with its source node or type expression), or a
-declaration or a part of one (`FN`, `STRUCT`, `ENUM`, `ALIAS`, `GLOBAL`,
-`LOCAL`, `FIELD`, `VARIANT`, `PARAM`, `GENERIC`, and `BINDER` for the
-variables bound by a loop, a match arm, an arm a `const for` generates or a
-block parameter). `FileIndex::calls` holds every call's extent, and
+every declaration and body once. Occurrences have two categories. Uses are
+`IDENT`, `DOT` for a member, `TYPE`
+for a type name, or `INIT` for a field named in a struct literal. Each keeps
+its source node or type expression. Declarations and declaration parts use
+`FN`, `STRUCT`, `ENUM`, `ALIAS`, `GLOBAL`, `LOCAL`, `FIELD`, `VARIANT`,
+`PARAM`, or `GENERIC`. `BINDER` covers variables bound by loops, match arms,
+arms generated by `const for`, and block parameters. `FileIndex::calls` holds
+every call's extent, and
 `FileIndex::spans` every node's extent, including the top-level
 declarations'. A node's extent runs from the earliest token in it (a
 binary's left operand lies before the operator the node is anchored at) to

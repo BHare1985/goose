@@ -349,11 +349,11 @@ past" follows from the list being built as statements are emitted.
 Reverse order also puts each body before the release of every declaration
 that precedes it, which is the storage it can name.
 
-Inlining and function values need nothing new. An inlined call is an
-`InlineBlock` whose `return`s exit the block (`Return::CgStmt`,
-implementation.md §4), a function value's body is spliced into the caller
-with its locals as ordinary locals (`EmitFvCall`, §6.6), and `const for`
-copies its body per iteration; in all three cases a `defer` ends up in an
+Inlining and function values need no new mechanism. An inlined call becomes an
+`InlineBlock`, and its `return`s exit that block (`Return::CgStmt`,
+implementation.md §4). A function value's body is spliced into the caller, with
+its locals treated as ordinary locals (`EmitFvCall`, §6.6). `const for` copies
+its body for each iteration. In all three cases, a `defer` ends up in an
 ordinary scope of the enclosing function.
 
 ### 4.3 `return … from` and block returns
@@ -383,20 +383,22 @@ long-distance return is in flight**. Today nothing executes between a
 relies on that: `gs_rf` is one thread-local flag, and the channels are per
 target. A defer body in an intermediate frame runs in exactly that window.
 
-The obvious case is a body that performs or propagates a long-distance
-return itself: it overwrites the flag being carried, and its own propagation
-starts from inside the frame's `PropagateReturn`. The case that is easy to
-miss is a **contained** one. A callee that throws and catches entirely
-inside itself does not propagate, so its `hasrf` is false, yet its throw
-writes `gs_rf` and its catch zeroes it (`EmitRfCheck` sets `gs_rf = 0` where
-a propagation ends). The intermediate frame then finishes its
-`PropagateReturn` with `gs_rf == 0`, so its caller's check finds no
-propagation and takes the dummy return value as a real result, and nothing
-reports the problem. A `defer close(x)` whose `close` uses `exception::try`
-three calls down would miscompile silently. A callee that re-enters the
-in-flight target would also overwrite that target's `gs_lret` and
-`gs_fval` channels if its inner return fires. So "no call to a propagating
-specialization" is not enough.
+A deferred body that performs or propagates a long-distance return would
+overwrite the flag already being propagated. Its own propagation would start
+inside the frame's `PropagateReturn`.
+
+A **contained** throw can also overwrite that flag. If a callee both throws and
+catches internally, its `hasrf` is false because it does not propagate. Its
+throw still writes `gs_rf`, and its catch clears it (`EmitRfCheck` sets `gs_rf =
+0` where propagation ends). The intermediate frame then finishes
+`PropagateReturn` with `gs_rf == 0`. Its caller sees no propagation and accepts
+the dummy return value as a real result, without an error. For example, `defer
+close(x)` would silently miscompile if `close` used `exception::try` three calls
+down.
+
+A callee that re-enters the target of the pending return could also overwrite
+that target's `gs_lret` and `gs_fval` channels if its inner return fires. For
+these reasons, forbidding calls to propagating specializations is not enough.
 
 This is C++'s "destructors must not throw", and unlike C++ it can be a
 compile-time rule, in one of two strengths:

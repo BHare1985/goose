@@ -172,15 +172,17 @@ The following approaches remain useful:
 
 ## Future option A: bounded independent dynamic stacks
 
-A slice pool cannot provide element addresses that stay put while a document
-grows, growth that never copies, release of a closed document's memory to the
-OS, isolation of one document's fragmentation from the others, or more total
-storage than one reservation. This option extends the dynamic stacks idea
-in spec 11.3 to a runtime-sized collection whose elements each own an
-independently growing stack: a resizable array of resizable arrays. This is a
-new owning container, not something today's placement rules already permit.
-Its descriptor table can grow or reuse slots while the element storage stays in
-separately reserved address regions.
+A slice pool has several limits: element addresses can change during growth,
+growth can copy data, and closing a document does not return its memory to the
+OS. Documents also share fragmentation and are limited to one reservation's
+total storage.
+
+This option extends the dynamic stacks idea in spec 11.3. It proposes a
+runtime-sized collection in which each element owns an independently growing
+stack: a resizable array of resizable arrays. Today's placement rules do not
+permit this, so it requires a new owning container. Its descriptor table could
+grow or reuse slots while element storage stays in separately reserved address
+regions.
 
 For a supported 64-bit target, define a virtual-address reservation budget rather
 than assuming that a 64-bit pointer provides 2^64 usable bytes. A runtime profile

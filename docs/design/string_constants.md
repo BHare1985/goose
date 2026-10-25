@@ -401,13 +401,12 @@ Narrowing a `const T?`, loading a relative reference, and resolving a
 
 ## 4. Recommendation
 
-Option 1 should be ruled out. It has the cleanest *model*, with no memory
-outside the stacks, but the user pays for that cleanliness: every function
-that returns a name as `u8[:]` stops compiling, every slice parameter given
-a literal costs a copy, and the implementation is not smaller than the
-others (it adds a new stack per function with its own scoping, and it still
-needs option 2a's rule for constants). The spec itself says that the
-language exists to avoid this kind of hidden copy.
+Option 1 should be ruled out. It keeps all memory on stacks, but every function
+that returns a name as `u8[:]` would stop compiling, and passing a literal to a
+slice parameter would copy it. The implementation is no smaller than the
+alternatives: it adds a stack per function with its own scoping and still needs
+option 2a's rule for constants. These hidden copies also conflict with the
+spec's stated goals.
 
 Option 2b works and is the most precise, but it is the "complex analysis"
 the discussion anticipated: about 300 lines that touch every place
@@ -416,18 +415,16 @@ poisoned the container. The three paths missed by the first implementation
 also suggest a substantial maintenance burden alongside the existing root
 analysis.
 
-Option 4 is preferable for the language design. It is the only option that
-*removes* a rule: the laundering clause and its "const-cast" loophole are
-gone, and writability becomes a property of a type that you can read off a
-declaration. The same feature also supports other uses, such as read-only
-views in data structures, `extern` declarations that say what the C side may
-do, and a `split` that serves literals. Its costs are real but bounded and
-predictable. `const` is needed at slots that hold read-only data, which in
-the corpus meant nine sites and the `os` externs. And, as in C++, a generic
-container keyed by views must be told `const u8[:]`. On its own, option 4
-would not be a runtime fix for the thread race if an annotation were ever
-wrong. But an annotation cannot be wrong, because dropping `const` is never
-implicit; static data is provably unwritten and is emitted as C `const`.
+Option 4 is preferable for the language design. It removes the laundering rule
+and its "const-cast" loophole. Writability becomes a type property visible in
+the declaration. This also supports read-only views in data structures, `extern`
+declarations that state what C may write, and a `split` that accepts literals.
+
+The cost is extra annotations on slots that hold read-only data: nine sites and
+the `os` externs in the corpus. As in C++, a generic container keyed by views
+must specify `const u8[:]`. Correct annotations are necessary to prevent the
+thread race, but the checker enforces them: `const` is never dropped implicitly.
+Static data is therefore provably unwritten and emitted as C `const`.
 
 Compared with option 3: 3 has no cost in the language and no cost at runtime
 without workers, and it keeps laundering, which the spec chose deliberately.

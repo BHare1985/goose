@@ -55,16 +55,16 @@ In `respond`, the inline Goose DTO takes 507/491 ms against Rust's DTO at
 Compare matching interfaces when deciding which result applies to an
 application.
 
-**Read the aggregate with the row-level controls.** The aggregate takes the
-fastest Goose implementation separately for each backend and comparison
-tier, and takes each memory figure independently from the smallest
-implementation. Thus `graph` speed uses CSR while its memory figure uses
-linked adjacency, and `words` speed uses the hand-written table while
-memory uses `dictionary`. The `respond` headline uses streaming, and `blur`
-uses row slices under MSVC and flat indexing under clang. These are not the
-resource profiles of a single implementation. `words` also compares
-different hash functions and table policies; the Goose dictionary uses less
-memory than its hand-written table but runs more slowly.
+**The aggregate combines results from different implementations.** For each
+backend and comparison tier, it uses the fastest Goose implementation. Memory
+figures are selected separately, using the implementation with the lowest memory
+use. For example, `graph` speed comes from CSR and its memory figure from linked
+adjacency. `words` speed comes from the hand-written table and its memory figure
+from `dictionary`. The `respond` headline uses streaming; `blur` uses row slices
+under MSVC and flat indexing under clang. No single implementation has all of
+these results. Also, `words` compares different hash functions and table
+policies: the Goose dictionary uses less memory than its hand-written table but
+runs more slowly.
 
 **These are whole-process measurements on one machine.** They include input
 generation, construction and teardown, use the best of three runs after two

@@ -181,7 +181,7 @@ entry is validated independently, and entries need not have the same type.
 There is no common-element-type inference, array allocation, or runtime
 evaluation of the source. Repeated entries are preserved; `[]` is empty.
 
-The initial constant-expression subset is deliberately bounded:
+The initial version accepts these constant expressions:
 
 * Integer, character, floating-point, boolean, and string literals; a signed
   numeric literal may use unary `-` subject to the normal representability
@@ -194,11 +194,11 @@ The initial constant-expression subset is deliberately bounded:
 * Constant bindings of enclosing `const for` expansions, including their use
   as operands in those supported integer expressions.
 
-Arbitrary function calls, runtime variables, aggregate construction,
-references, function values, and general floating-point or string computation
-are outside this subset. A nonconstant entry is an error; it does not fall
-back to runtime iteration. This is a specification of accepted forms, not
-permission to accept whatever an optimizer happens to fold.
+Arbitrary function calls, runtime variables, aggregate construction, references,
+function values, and general floating-point or string computation are outside
+this subset. A nonconstant entry is an error; it does not fall back to runtime
+iteration. Only the forms listed here are accepted, even if an optimizer could
+fold other forms.
 
 Materializing a constant binding preserves the distinction between an
 adaptable literal and a value with a declared type. It must not erase a named
@@ -484,11 +484,11 @@ that boundary rather than in a source-text preprocessing pass.
    `match`'s complete arm list before its exhaustiveness and binder checks.
 6. Pass ordinary checked constructs to optimization and code generation.
 
-The parser need not resolve a member named `A` or know the members of `T`.
-However, this is not solely an identifier-replacement pass: semantic binding
-information and the distinct fragment categories must survive parsing and
-resolution. The existing `FieldInit` name representation will need a way to
-distinguish literal labels from bound accessors.
+The parser need not resolve a member named `A` or know the members of `T`. It
+does need to preserve semantic bindings and distinguish fragment categories
+through parsing and resolution. Replacing identifier text alone is not enough.
+The existing `FieldInit` name representation will need to distinguish literal
+labels from bound accessors.
 
 The compiler need not prove a generic expansion valid for every possible type.
 It checks the instances the program reaches, as for other generic code. Empty
@@ -565,12 +565,12 @@ includes:
   expansion, explicit entries and commas, duplicate/missing fields, and `..`.
   Preserve default evaluation, declaration-order effects, and construction
   directly in each destination, including non-fixed fields.
-* Variants of ADTs with and without payloads and of an enum without variants;
-  declaration order; `variants` in statement lists, constructors, and arm
-  lists; `fields<V>` reads and variant construction; by-value and by-reference
-  arms in fixed and variable mode, and their lifetime errors; written arms and
-  `_` beside an expansion, missing and repeated variants, and a pattern
-  variant of another ADT.
+* Variant tests should cover ADTs with and without payloads, an enum without
+  variants, and declaration order. Exercise `variants` in statement lists,
+  constructors, and arm lists, as well as `fields<V>` reads and variant
+  construction. Test by-value and by-reference arms in fixed and variable mode,
+  including lifetime errors. Also test written arms and `_` beside an expansion,
+  missing and repeated variants, and a pattern variant from another ADT.
 * Parse/dump round trips and errors that identify the failing expansion entry.
 * Generated-code inspection for absent reflection infrastructure, ordinary
   callback dispatch, unnecessary copies, and repeated dynamic offset walks.
@@ -583,10 +583,10 @@ includes:
   and not every storage type is legal as an ordinary function result.
 * **Constant integer ranges.** Reuse half-open `lo..hi` syntax with constant
   bounds if adopted. V1 supports explicit constant lists only.
-* **`const if` or filtering.** Select fragments using a deliberately specified
-  set of compile-time predicates, such as expanding only some variants into
-  arms beside written ones. This must not be confused with an ordinary
-  runtime `if`, and must not silently introduce arbitrary compile-time calls.
+* **`const if` or filtering.** Define a set of compile-time predicates for
+  selecting fragments. For example, a predicate could expand only some variants
+  into arms alongside written arms. This would be distinct from an ordinary
+  runtime `if` and would not allow arbitrary compile-time calls.
 * **Additional fragment positions.** Argument lists and array-element lists,
   followed by other justified grammar positions. The shared expansion model
   permits these additions, but each needs explicit parsing, ordering, and

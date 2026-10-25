@@ -1721,15 +1721,14 @@ reference; there is no way to write through one *without* narrowing it.
 
 ### What references may point to
 
-A reference may point to anything, with two restrictions that the sections
-on enums and shrinking explain: nothing may point into the payload of a
-fixed-mode enum ([section 9](#two-modes)), and a reference into a
-grow-shrink array `T[>..<]` may live in a variable only and must be done
-with before the array next shrinks
-([section 13](#13-growing-shrinking-and-assigning-whole-arrays)).
-A reference into a grow-only array stays valid for as long as it can be
-named. A reference into a limited array stays valid across pops and
-pushes, and reads whatever value the slot currently holds.
+A reference may point to anything except a fixed-mode enum's payload ([section
+9](#two-modes)). A reference into a grow-shrink array `T[>..<]` has a further
+restriction: it may be held only in a variable and must no longer be used when
+the array next shrinks ([section
+13](#13-growing-shrinking-and-assigning-whole-arrays)). References into
+grow-only arrays stay valid for as long as they can be named. References into
+limited arrays stay valid across pops and pushes, and read whatever value their
+slot currently holds.
 
 ---
 
@@ -2104,18 +2103,19 @@ Spec §9.5.
 
 ### Where a reference read out of a container may point
 
-A container names a scope, not the storage its contents point into, so
-the root of a reference read out of a container is re-derived. The
-reference may point into any variable in scope whose own storage can hold
-a value of its type; each such variable is a **candidate**. Where there is
-exactly one candidate, the reference is rooted there exactly. Where there
-are several, it is rooted at all of them, inexactly, and a rule that needs
-the exact identity of the array (a relative-link store, `index_of`, which
-array a shrink through the reference frees) reports the candidates it
-could not choose between: "`n` was read out of `slots` and may point into
-`pool` or `spare`". Two things narrow this: a relative link `in pool`
-always points into `pool`, exactly, and a local holder whose every store
-the checker has seen is rooted at what was stored into it. Spec §9.5.
+A container identifies a scope, but not necessarily the storage its contents
+point into. The checker therefore derives the root again when reading a
+reference from a container. Each variable in scope whose storage can hold the
+pointee's type is a **candidate**. With one candidate, the reference is rooted
+there exactly. With several, it is rooted at all of them inexactly.
+
+Some operations need an array's exact identity: storing a relative link, calling
+`index_of`, or determining which array a shrink through the reference frees. If
+the checker cannot choose, it reports the candidates: "`n` was read out of
+`slots` and may point into `pool` or `spare`". Two rules narrow the candidates.
+A relative link `in pool` points exactly into `pool`. A local holder whose
+stores are all known to the checker is rooted at the values stored into it. Spec
+§9.5.
 
 ### Reading the errors
 

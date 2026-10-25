@@ -680,14 +680,15 @@ the only platforms it has been tested on.
 
 ## 8. Testing
 
-* `test/packages/` holds fixtures that are roots declaring packages from
-  path sources under the same directory. They cover: a pure Goose package
-  with `import pkg.sub;`; requirements that are satisfied, missing (the
-  error names the line), from a different source (error) and at a
-  different ref (warning); a package-vs-local-file collision; a plain-C
-  package run under JIT and built AOT; a CMake package, skipped with a
-  notice where cmake is not on PATH; a `main_thread_only` package reached
-  from a `thread_fn`; and `embed_file`.
+* `test/packages/` contains root fixtures that declare packages from path
+  sources in the same directory. They test a pure Goose package with `import
+  pkg.sub;` and requirements that are satisfied, missing, from a different
+  source, or at a different ref. A missing requirement reports its line; a
+  different source is an error, and a different ref is a warning. Other fixtures
+  cover package/local-file collisions, a plain-C package run under JIT and built
+  AOT, and a CMake package (skipped with a notice if cmake is not on PATH). They
+  also cover a `main_thread_only` package reached from a `thread_fn`, and
+  `embed_file`.
 * Git sources: the runner creates a bare repository with `git init` and a
   tag, and a fixture declares it as `file://…@tag` and as `@<hash>`, so the
   fetch path is tested offline. These tests are skipped without git.

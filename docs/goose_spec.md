@@ -230,10 +230,10 @@ A grammar sketch and precedence table are in Appendix D.
 * `bool` — 1-byte storage, values `true`/`false`. Produced by comparisons;
   required by `if`/`while` conditions (no int-to-bool coercion).
 
-Integer literals are *constants without a committed type*: they adapt to any
-integer type whose range holds their value (`let x: u8 = 255;` is fine,
-`= 256` is a compile error), and where nothing constrains them they are
-`i64` (`u64` for values above `i64.max`). A **named constant** is a `let`
+Integer literals are *constants without a committed type*. They adapt to any
+integer type that can hold their value: `let x: u8 = 255;` is valid, but `=
+256` is a compile error. Without a type constraint, they are `i64`, or `u64`
+for values above `i64.max`. A **named constant** is a `let`
 or `const` global with no written type whose initializer is an integer
 constant expression (`let SZ = 15;`, `let B = SZ * 2;`, `let NEG = -3;`).
 It is also a constant without a committed type: each use of it adapts as
@@ -561,11 +561,11 @@ convention.
 **Text.** Every scalar, `bool`, and `u8` array or slice has a text form:
 
 * integers in decimal;
-* floats in the shortest form that reads back to the same value of their
-  own type (so an `f32` 0.1 prints as `0.1`, not as the digits of the
-  `f64` it widens to), with `.0` after a whole number so it still reads as
-  a float (`1.0`, `-0.0`, `2147483600.0`; `1e+20` keeps its exponent form),
-  infinities as `inf` and `-inf`, and every NaN as `nan`;
+* floats in the shortest form that reads back to the same value of their own
+  type. An `f32` 0.1 prints as `0.1`, without the extra digits of its widened
+  `f64` value. Whole numbers get `.0` so they still read as floats (`1.0`,
+  `-0.0`, `2147483600.0`); exponent forms such as `1e+20` keep that form.
+  Infinities print as `inf` and `-inf`, and every NaN as `nan`;
 * `true`/`false`;
 * a `u8` array's bytes as they are.
 
@@ -801,12 +801,13 @@ array/pool* as the location storing it.
   be re-stored with `.=`/`=`.
 * Copying a *value that contains* self-relative references is a compile
   error, since the copied offsets would still be measured from the source
-  location. Such copies are assignment from an lvalue, a by-value argument,
-  a by-value match binder or case function parameter (§8.1, §8.2), an
-  element copy, an `append` of anything but an array literal, the value a
-  `format` overload takes by value (§3.7), a `resize` fill value (which is
-  copied into every slot it adds, even when it is a literal), and
-  `copy(x)`. What a reference names is copied in the same way wherever a
+  location. This prohibits assignment from an lvalue, by-value arguments, by-value match
+  binders or case function parameters (§8.1, §8.2), and element copies. It
+  also prohibits `append` except with an array literal, by-value inputs to a
+  `format` overload (§3.7), `resize` fill values, and `copy(x)`. A `resize`
+  fill value is copied into every added slot, even when it is a literal.
+
+  What a reference names is copied in the same way wherever a
   value destination meets the reference (§3.8, §4.1). For an `f` returning
   `Node&`, `let n = f();` copies the node out of the array its links point
   within. So do a `var`, an annotated declaration, a by-value argument, a
@@ -821,14 +822,18 @@ array/pool* as the location storing it.
   self-relative references are not read, sliced or iterated; a `match`
   does not bind its payload by reference; and `print`, which renders a
   reference as its pointee, does not render the value. A scalar field of
-  such a value reads as usual (`a.pop().v`). Construct such values in
+  such a value reads as usual (`a.pop().v`).
+
+  Construct such values in
   place, with literals. A field that a literal's `..` fills takes its
   type's default, whose links are null and whose limited arrays are empty,
   and is not a copy. Bind their match payloads by reference, and have case
   functions take their variants by reference and `format` overloads take
   them by reference. An ADT whose payloads hold self-relative references is
   used in variable mode, whose payloads bind by reference where the ADT is
-  not resizable (§3.5). A call's by-value result is not a copy either,
+  not resizable (§3.5).
+
+  A call's by-value result is not a copy either,
   since it is built where it is received (§4.3, §7.3); this includes a
   fixed-size aggregate and a trailing block's fresh result. Links to
   existing elements require the receiving storage and those elements to
@@ -837,7 +842,9 @@ array/pool* as the location storing it.
   does not inherit the enclosing result's root. A result relying on that
   root cannot be a resize fill, and cannot undergo a representation
   conversion that stages or moves its bytes; a variant may be constructed
-  behind its ADT's tag. A function's named result (§7.3) is not a copy
+  behind its ADT's tag.
+
+  A function's named result (§7.3) is not a copy
   either: it is a local that every return of the function gives, built at
   the destination from its declaration. A named result that is a struct
   ending in a resizable needs the fields before its resizable tail to be
@@ -961,13 +968,14 @@ are legal when its provenance is writable (§9.5).
   y exclusive; omit for 0 / len; `^k` means "len − k"), or allocated from a
   slice pool (§5.4). An array, or a reference to an array, that reaches a
   destination whose type is a slice of its element type implicitly becomes
-  a whole-array slice of that array itself, as `a[..]` would. Such
-  destinations are a parameter (where an exact-type overload wins over this
-  coercion), an annotated `let`/`var` or global, an assignment to a slice
-  variable, field or element, a struct or variant literal's field and a
-  field's default, an array literal's element, a `push`, a `return` or a
-  body's final expression, and a branch whose construct's value is a slice
-  (§6.4). The slice is `const` where the array is read-only (§9.5), and the
+  a whole-array slice of that array itself, as `a[..]` would. This conversion
+  applies to parameters, though an exact-type overload takes
+  precedence. It also applies to annotated `let`/`var` declarations and
+  globals; assignments to slice variables, fields, or elements; struct or
+  variant literal fields and field defaults; and array literal elements. Other
+  destinations include `push`, `return`, a body's final expression, and a
+  branch whose enclosing construct has a slice value (§6.4). The slice is
+  `const` where the array is read-only (§9.5), and the
   lifetime rules treat it as any other slice (§9.2):
   `let s: const u8[:] = item.name;` views `item.name`, while
   `let s: const u8[:] = make();` binds a view of a temporary and is an
@@ -1357,10 +1365,10 @@ can be reassigned (`=`, compound assignment, `++`) but never written into.
 Definite assignment is enforced: no reads of uninitialized locals; every
 declaration either has an initializer or is provably assigned on all paths
 before use. A `let` declared without an initializer gets its value once.
-Assigning it, or binding it with `.=` (§3.8), is an error wherever some path
-may already have given it a value: in a branch that joins there, in an
-earlier iteration of a loop it is declared outside of, or in a function
-called on the way, including the assigned value's own calls (§7.5). A
+Assigning it, or binding it with `.=` (§3.8), is an error if any path may
+already have given it a value. That includes a joining branch, an earlier
+iteration of a loop outside which it was declared, or a function called along
+the way. Calls that compute the assigned value also count (§7.5). A
 recursive cycle (§7.8) cannot assign such a `let` declared outside the
 cycle, since all the cycle's activations share it. Fixed arrays require full
 initialization (every slot is indexable); the `[v; n]` fill literal makes
@@ -1399,11 +1407,10 @@ types only, with operands unified per §6.1.
 
 ### 5.1 Grow-only `[>..]`
 
-"Grow-only" names the guarantee, not the operation set: **the array never
-shrinks while a reference or slice into it can be live.** Memory below the
-top never moves and is never reused while the owner lives, so every interior
-reference and slice stays valid for as long as it can be named, and a bound
-on the length holds across every `push`.
+A grow-only array can shrink, but **never while a reference or slice into it can
+be live.** Memory below the top never moves and is never reused while the owner
+lives. Every interior reference and slice therefore stays valid for as long as
+it can be named, and a bound on the length holds across every `push`.
 
 * `push`/`append` bump the stack.
 * May contain variable-size elements (build strings/ADTs in place, §7.3).
@@ -1500,11 +1507,11 @@ shrink, or only in a copy of it, does not pass.
 the pool is no reference into it, and a view taken through it is stored, if
 at all, in `refs`.
 
-Nor may the shrink free what a `for` loop around it walks (§6.5): each
-reference or slice on the path to the loop's sequence, which the loop loads
-again on every iteration, and the sequence it iterates in place (a slice, an
-element, a field), unless that sequence is a resizable array, whose length
-the loop reads again.
+A shrink must also preserve the storage that an enclosing `for` loop walks
+(§6.5). This includes every reference or slice on the path to the sequence,
+since the loop reloads that path on each iteration. It also includes the
+sequence iterated in place, such as a slice, element, or field. A resizable
+array is the exception: the loop reads its length again on each iteration.
 
 A variable is live at the shrink when it can be read again afterwards, that
 is, when it is named:
@@ -1721,11 +1728,13 @@ whole cycle has been checked.
   there, or recorded with it for the callers to judge (§5.1), since a
   parameter's view was also taken before the call. It still counts for the
   callers, as a balanced call where the caller is balanced too.
-  A function is balanced for an array X (what a reference parameter points
-  at, a global, or a captured variable) when each shrink of X in it is
-  either `X.resize(m)`, with or without a fill value, where `m` is a `let`
-  of the same activation initialized to exactly `X.len` of the same path X,
-  or a call that is balanced for X. The same path means one variable that
+
+  A function is balanced for an array X if every shrink of X is either a
+  balanced call for X or a qualifying `X.resize(m)`, with or without a fill
+  value. For the resize to qualify, `m` must be a `let` in the same
+  activation, initialized to exactly `X.len` on the same path X. The array may
+  be a reference parameter's pointee, a global, or a captured variable. The same
+  path means one variable that
   cannot be rebound (a `var` reference can be), followed by the same fields,
   none of them a reference. `pop`, `pop_n`, `clear`, a resize to anything
   else, and assigning X or a value holding it whole are not balanced.
@@ -1740,9 +1749,12 @@ whole cycle has been checked.
   A call is balanced for an array of the caller's when every shrink it may
   make, of any array that can be that array, is balanced. The caller's roots
   decide which arrays can be that array, and a parameter's array can be a
-  global, a captured variable, or another parameter's array. Grow-only
+  global, a captured variable, or another parameter's array.
+
+  Grow-only
   arrays have no balanced calls (§5.1): a callee can store references to its
   new elements into the caller's holders before shrinking them away.
+
   A call into a recursive cycle still being checked cannot be judged by the
   part of the callee checked so far, so it is taken to be balanced for every
   grow-shrink array it can reach until the cycle has been checked. Once it
@@ -1876,17 +1888,27 @@ where they point at a pool.
 
 ### 6.1 Operators
 
-C/Rust set: `+ - * / %` (`%` is Euclidean on integers, §6.2; on floats it is
-C `fmod`), comparisons, `! && ||`
-(short-circuit, `bool` only), bitwise `~ & | ^ << >>` (on integers),
-assignment statements `=`, `+=` etc. (the compound form of every binary
-operator, shifts included) on assignable lvalues, `.=` (reference
-rebinding, §3.8), reference identity `.==`/`.!=` (§3.8), and `++`/`--` as
-statements on integer lvalues (no expression form). Precedence is Rust's
-(Appendix D): the bitwise operators bind tighter than comparisons, so `x &
-mask != 0` is `(x & mask) != 0`, and shifts bind tighter than `&`. Range
-expressions `a..b` appear only in slicing brackets, `for` headers, and
-match arms.
+The operators follow C and Rust:
+
+* Arithmetic: `+ - * / %`. Integer `%` is Euclidean (§6.2); float `%` is C
+  `fmod`.
+
+* Comparisons. The logical operators `! && ||` accept `bool` only; `&&` and `||`
+  short-circuit.
+
+* Bitwise `~ & | ^ << >>` on integers.
+
+* Assignment statements on assignable lvalues: `=`, `+=`, and the compound form
+  of every other binary operator, including shifts.
+
+* Reference rebinding `.=` and reference identity `.==`/`.!=` (§3.8).
+
+* `++`/`--` as statements on integer lvalues, with no expression form.
+
+Precedence follows Rust (Appendix D). Bitwise operators bind tighter than
+comparisons, so `x & mask != 0` means `(x & mask) != 0`. Shifts bind tighter
+than `&`. Range expressions `a..b` appear only in slicing brackets, `for`
+headers, and match arms.
 
 **Operand unification.** A binary numeric operator's operands must reach
 *one common type*, which is also the result type. It is found as follows:
@@ -1933,13 +1955,14 @@ is therefore allowed **when the signed operand is known non-negative**: it
 converts to `u64` without changing value, and the comparison is a single
 unsigned one, no wider than either operand and never a hidden branch.
 
-"Known non-negative" is deliberately a *syntactic* property, not an inferred
-one: a non-negative integer literal, a `.len` or `.cap` (non-negative by
-§10.4), or a `let` bound to one of those. A `let` is never reassigned, but a
-writable reference to it can still change its value (§4.4), so a comparison
-may not rely on a `let` (or on one it was bound to) that is also bound to a
-writable reference anywhere: by `&`, `.=`, or a reference parameter, field or
-binding that is not `const`, in a nested function too. Either order is an
+"Known non-negative" is determined by syntax and is limited to a non-negative
+integer literal, a `.len` or `.cap` (non-negative by §10.4), or a `let` bound
+to one of those. A `let` is never reassigned, but a writable reference can still
+change its
+value (§4.4). A comparison therefore cannot rely on a `let` if it, or a `let`
+it was bound to, is bound to a writable reference anywhere. This includes
+bindings through `&`, `.=`, or a reference parameter, field, or binding that
+is not `const`. Bindings in nested functions count too. Either order is an
 error. Whether a comparison compiles thus
 depends only on what is written, never on how much the optimizer managed to
 prove. Other cases require an explicit cast because conversion may change the
@@ -2036,14 +2059,15 @@ a float becomes an integer only through a cast: dropping the fraction is the
 real loss of information, while an integer too large for the float's
 mantissa rounds as every float result does.
 
-* **Implicit** (silent, everywhere a value meets a differently-typed
-  destination or operand): to a *wider* integer type of the same
-  signedness (`i8→i16/i32/i64`, `u8→u16/u32/u64`); from an unsigned type to
-  any *strictly wider* signed type (`u8→i16..i64`, `u32→i64`); `f32 → f64`;
-  constants into any type their value fits (§3.1); and every integer type
-  into both float types, `i64` and `u64` included, a literal as much as any
-  other value (`2` works where a float is expected as well as `2.0` does).
-  Also: any integer type except `u64` into a `varint` store (§3.6).
+* **Implicit conversions** apply wherever a value meets a differently typed
+  destination or operand. An integer widens to the same signedness
+  (`i8→i16/i32/i64`, `u8→u16/u32/u64`), and an unsigned integer converts to a
+  strictly wider signed type (`u8→i16..i64`, `u32→i64`). Other implicit
+  conversions are `f32 → f64`, constants to any type that holds their value
+  (§3.1), and every integer type to either float type. The last rule includes
+  `i64`, `u64`, and literals: `2` works where a float is expected, just as `2.0`
+  does. Any integer type except `u64` also converts implicitly into a `varint`
+  store (§3.6).
 * An integer becoming a float takes the float's nearest value where it has
   no exact one (beyond 2^24 in magnitude for `f32`, 2^53 for `f64`). No
   conversion to a float traps, in a debug build either.
@@ -2950,13 +2974,14 @@ the cycle in the same way, whatever the size of its pointee. Suppose that:
   itself, a subslice or field of it, or a parameter of the calling
   activation passed on in the same way.
 
-Then the parameter points at the same storage in every activation, and
-references rooted at it or read through it may be stored inside the cycle,
-into storage that is the same in every activation: a local, a pool, or what
-another such parameter points at or leads to, but not what a parameter that
-the cycle passes something else points at or leads to. So a recursive walk
-over a context of borrowed tables (A.6) stores the views it reads through
-the context into the tables it reaches through the context.
+The parameter then points at the same storage in every activation. References
+rooted at it or read through it may be stored inside the cycle, provided the
+destination storage is also the same in every activation. This can be a local, a
+pool, or storage pointed to or reached through another parameter with the same
+guarantee. It cannot be storage pointed to or reached through a parameter that
+the cycle passes a different value. For example, a recursive walk over a context
+of borrowed tables (A.6) can store views read through the context into tables
+reached through that context.
 
 A parameter whose argument on every call is a reference or slice read
 through one such parameter, or through a pool, also points outside the
@@ -3141,11 +3166,11 @@ extern "SDL2" {
 }
 ```
 
-A member is an `extern fn` in every respect above. It is fully typed, not
-generic and has no body, and the same shapes cross the boundary, with one
-exception: a struct holding a `pad` by value crosses by reference, because
-the library's own struct has padding where Goose's C has a byte array, and
-a calling convention may pass the two differently. A string after `=` gives
+A member is an `extern fn` in every respect above. It is fully typed,
+non-generic, and has no body. It accepts the same shapes,
+with one exception: a struct holding a `pad` by value must cross by reference.
+The library's struct has padding where Goose's generated C has a byte array,
+and the calling convention may pass these differently. A string after `=` gives
 its C symbol, which is otherwise its Goose leaf name. Its name is a
 `declname`, so a namespaced member is written as it would be outside the
 block. A member is written without `extern`, since the block's `extern`
@@ -3603,12 +3628,12 @@ Rules (scopes ordered by nesting; globals are the outermost scope, §11.1):
   read-back rule's answer for a global, §9.5), rather than only the roots
   bound so far.
 * Inside recursive cycles the stricter §7.8 cycle store rule applies.
-* A **temporary** is an array, struct or variant literal, a call's result,
-  `copy(x)`, `default<T>()`, or the value of an `if`, `match`, `block`,
-  `loop` or bare `{ }` whose branches do not join as a slice (§6.4), when
-  it is viewed where it stands rather than built into a destination (viewed
-  by a slice destination, a `for`, `[..]`, `bytes_of` or a path into it,
-  §4.2). The value of such a construct is a copy of what the branch taken
+* The following expressions create a **temporary** when viewed in place instead
+  of built into a destination: array, struct, and variant literals; call
+  results; `copy(x)`; `default<T>()`; and values of `if`, `match`, `block`,
+  `loop`, or bare `{ }` constructs whose branches do not join as a slice
+  (§6.4). A view can come from a slice destination, a `for`, `[..]`,
+  `bytes_of`, or a path into the value (§4.2). The value of such a construct is a copy of what the branch taken
   produced, even where that branch names a variable. A temporary lasts for
   the rest of its statement, or for the rest of the block whose final
   expression made it. Its scope is that
@@ -3704,20 +3729,19 @@ path that reaches it. Every value of reference or slice type is either
 read-only or writable, and where that property comes from is *inferred*
 per instantiation, in the same way as roots, with no annotation needed:
 
-* Read-only: a string literal (`const u8[:]`, §3.7); `&x` and `x[..]` of a
-  `const` value, of a field of one, or of a by-value `for`/`match` binding
-  (§6.5), and such an `x` bound by reference (§4.1), all of which are
-  `const T&` and `const T[:]`; a view into a temporary (§9.2), since a
-  write would change nothing but the temporary; a `bytes_of` view (§12);
-  whatever is read out of a slot declared `const`; and a self-relative
-  reference read along a read-only path. A slice loaded through a reference
-  to a slice is the slice in the slot the reference names, and it is
-  writable only where both the reference and that slice are. So a
-  reference to a slice variable holding a read-only slice is read-only too,
-  however it is made (`&s`, or `s` bound by reference, §4.1). A `let`
-  binding *of* a reference or slice names the reference: it does not
-  rebind, and writes through it follow the value's own constness
-  (`let r .= xs[i]; r = 0;` writes an element of a `var` array, §3.8).
+* Read-only values include string literals (`const u8[:]`, §3.7). A view made
+  with `&x`, `x[..]`, or reference binding (§4.1) is also read-only when `x` is
+  a `const` value, a field of one, or a by-value `for`/`match` binding (§6.5).
+  These views have types `const T&` or `const T[:]`. Views into temporaries are
+  read-only because a write would change only the temporary (§9.2). So are
+  `bytes_of` views (§12), values read from slots declared `const`, and
+  self-relative references read along a read-only path. A slice loaded through a
+  reference-to-slice is the slice in the referenced slot. It is writable only if
+  both the reference and the slice are writable. A reference to a variable
+  holding a read-only slice is therefore read-only too, whether made with `&s`
+  or by binding `s` by reference (§4.1). A `let` binding of a reference or slice
+  prevents rebinding; writes through it follow the value's own constness. For
+  example, `let r .= xs[i]; r = 0;` writes an element of a `var` array (§3.8).
 * Writable: everything else, that is, `&x` and `x[..]` of a `var` or of a
   plain `let`, and whatever else is read out of a slot that is not `const`.
 * **Parameters and results are generic over constness.** A parameter
@@ -3788,7 +3812,9 @@ candidate for it. Then, depending on where `C`'s own root lies:
    only when there is exactly one candidate in all and that candidate is
    not such a parameter's root. The candidates are the variables in scope
    at the read: an array that comes into scope after the read cannot be the
-   owner and is not a root of the value. Where `C` is a local that holds
+   owner and is not a root of the value.
+
+   Where `C` is a local that holds
    values rather than a reference or slice, everything stored into `C`
    since it was made is on record: stores through a reference to it, by a
    function it was passed to, or later in a loop around the read. Where
@@ -3803,13 +3829,17 @@ candidate for it. Then, depending on where `C`'s own root lies:
    held, so a slice of `g.edges` for a `g: Graph` parameter is bounded by
    that argument's root. It is not bounded by the callee's other
    parameters, which can hold its element type but none of the caller's
-   views. A copy of a field or an element of such a local (a `let` of one,
+   views.
+
+   A copy of a field or an element of such a local (a `let` of one,
    a `for` or `match` binder's copy, a popped element, or a value loaded
    whole through a reference to it) holds no more than was stored into the
    local, and that record then applies to the copy too: out of
    `let hs = [H { r: a }]`, `hs[0].r` points exactly into `a`. A copy out
    of any other container has only its container's scope on record, and
-   its roots are the candidates. A nested function's or a function value's
+   its roots are the candidates.
+
+   A nested function's or a function value's
    body reads a local of the function it is written in as one of its own
    locals here, with that local's stores on record in the same way: the
    body is checked for the state each call finds the local in (§7.5,
@@ -3883,12 +3913,11 @@ it points into that pool, so it is rooted there exactly. This keeps a
 container of links usable where a container of plain references would be
 ambiguous.
 
-A diagnostic that turns on an inexact read-back names the container the
-value came out of and the candidates the checker could not choose between
-("`n` was read out of `slots` and may point into `pool` or `spare`", "`g`
-is a global var, which any function may bind, and may point into `pool` or
-`spare`"). Where only the caller knows the candidates, it names instead the
-parameter whose pointee bounds the value.
+When a diagnostic depends on an inexact read-back, it names the source container
+and the possible roots. For example: "`n` was read out of `slots` and may point
+into `pool` or `spare`", or "`g` is a global var, which any function may bind,
+and may point into `pool` or `spare`". If only the caller knows the candidates,
+the diagnostic instead names the parameter whose pointee bounds the value.
 
 Writability checks depend on the callee's operations. A function that mutates
 its slice argument can compile for a writable argument and fail for a
@@ -4718,13 +4747,13 @@ count is that header's `len`, so its tail cannot be referenced either.
   registers; in the element-run form it emits only raw elements. Because
   in-flight return data carries no inline header above the caller's live
   data, `v.append(f())` is always contiguous.
-* Hidden arguments, in order after declared ones: free-variable references
-  (§7.5), destination/target stack identities. The `return from`
-  discriminant is not in the signature: it is a single thread-local int
-  (0 = normal, k = propagate to target k) that is zero except between a
-  `return … from` and the catch in its target frame, so an ordinary return
-  writes nothing and a call on a propagation path costs a load and a
-  never-taken branch.
+* Hidden arguments follow the declared arguments in this order: free-variable
+  references (§7.5), then destination/target stack identities. The `return from`
+  discriminant is a single thread-local int, not a signature argument: 0 means
+  normal execution, and k means propagate to target k. It is nonzero only
+  between a `return … from` and the catch in its target frame. An ordinary
+  return therefore writes nothing. A call on a propagation path costs a load and
+  a never-taken branch.
 
 ### C.4 Guard pages and commit order
 
@@ -4890,11 +4919,12 @@ compiler's own description, pass by pass and analysis by analysis, is
   address (C.2), and a pool reference (§5.4) carries the freelist as well.
   There is no surface syntax; the form is per instantiation, and a variable
   keeps the one its first binding gives it (§5.4).
-* **Stack assignment** is the hidden-argument strategy §10.3 permits: every
-  function that uses data stacks takes its base index as a hidden argument
-  and addresses its nonfixed locals at constant offsets from it, callees
-  start above its in-use watermark, and every stack the program can reach
-  (a compile-time count, §7.8) is reserved as its thread program starts.
+* **Stack assignment** uses the hidden-argument strategy permitted by §10.3.
+  Every function that uses data stacks receives a base index as a hidden
+  argument and addresses its nonfixed locals at constant offsets from that
+  base. Callees start above the function's in-use watermark. All stacks
+  reachable by the program are reserved when its thread program starts; their
+  count is known at compile time (§7.8).
   The globals of a program instance, together with the dedicated stacks of
   the resizable globals, form one struct reached through a single
   thread-local pointer (a plain pointer in a program without workers).

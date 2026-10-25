@@ -90,10 +90,10 @@ already uses to cap `hardware_threads()`.
   growing with `memory.grow`. If the stack most likely to hold the
   program's large resizable is placed there, the common case (one big
   growing array) is limited only by the memory's own maximum.
-* **wasm64** lifts the 4 GB cap in principle. Browsers cap memory64 (V8 at
-  16 GB), and every access needs an explicit bounds check. wasmtime can
-  reserve far more and commit it lazily, which makes fixed partitions under
-  wasm64 essentially the native model. That makes them the pragmatic choice
+* **wasm64** removes the 4 GB address limit in principle, but browsers still cap
+  memory64 (V8 at 16 GB), and each access needs an explicit bounds check.
+  wasmtime can reserve much more and commit it lazily. Fixed partitions under
+  wasm64 therefore work much like the native model and are a practical choice
   for WASI and server-side targets.
 
 ## 4. Relocating stacks

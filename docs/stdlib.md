@@ -289,10 +289,14 @@ ipnsort. It is unstable (the order it leaves equal elements in is
 unspecified), works in place and does not allocate. Its partition does not
 branch on the comparisons, and a run of equal keys takes a linear pass
 rather than n log n. Heapsort takes over a range that partitioning keeps
-splitting badly, so the worst case is O(n log n). `stable_sort` is a
+splitting badly, so the worst case is O(n log n).
+
+`stable_sort` is a
 natural merge sort: it finds the runs already in order (or in strictly
 descending order, which it reverses) and merges them pass by pass between
-`xs` and a temporary of `xs.len` elements on a fresh data stack. Both make a
+`xs` and a temporary of `xs.len` elements on a fresh data stack.
+
+Both make a
 single pass over input that is already in order or strictly descending,
 and neither allocates for such input or for 20 elements or fewer. A
 comparator that is not a strict weak ordering (`<=`, or `<` over floats
@@ -450,10 +454,10 @@ The language's checks and limitations still apply:
 * Only calls to `throw` are caught. Runtime failures, `abort` and `exit`
   remain uncatchable. There is no stack-trace facility.
 
-There is deliberately no `protect`/`finally` helper. A callback can run
-cleanup after normal completion or a caught exception, but a block's
-lexical `return` or a `return ... from` targeting another function bypasses
-that callback. Such a helper cannot guarantee cleanup on all exits.
+There is no `protect`/`finally` helper because it could not guarantee cleanup on
+every exit. A callback can clean up after normal completion or a caught
+exception. However, a block's lexical `return` or a `return ... from` targeting
+another function bypasses that callback.
 
 ## dictionary
 
@@ -614,7 +618,9 @@ views, limited-array capacity and virtual-address reservations; subsequent
 growth works normally. It affects no other worker. Use it after a large
 workload, such as replacing a document, rather than after every temporary
 value. Ordinary scope exit keeps pages available for cheap reuse, while a
-trimmed page causes a page fault when the stack grows into it again. The
+trimmed page causes a page fault when the stack grows into it again.
+
+The
 pages are released immediately. Windows decommits them, which also returns
 their commit charge, and Linux drops them from the resident set at once;
 on both, a stack that grows again gets fresh zeroed pages. macOS marks the
@@ -945,11 +951,15 @@ number without a fraction or an exponent that fits an `i64` becomes an
 `Int`. Any other number becomes a `Num`, correctly rounded, and infinite if
 it is too large for an `f64`. Escapes decode to UTF-8: a surrogate pair
 becomes one code point, and a lone surrogate becomes the three bytes that
-encode its own code point. Strings are not checked to be valid UTF-8. On
+encode its own code point. Strings are not checked to be valid UTF-8.
+
+On
 malformed text, `parse` returns null and a message naming the byte at which
 it found the text malformed, such as
 `json: expected ',' or '}' at byte 41`. The nodes before that point have
-already been pushed. The parser is a single loop
+already been pushed.
+
+The parser is a single loop
 that keeps the open containers on a stack of its own, so nesting of any
 depth can be parsed. `member` and the accessors accept a null node, so
 lookups can be chained. Duplicate keys stay in the tree, and `member` finds
@@ -2024,20 +2034,21 @@ fn wants_keyboard(c) -> bool     // a text field or a property being typed into 
 fn wants_mouse(c) -> bool        // over a window or popup taking input, or dragging from one
 ```
 
-A text field has the keyboard from the click that focuses it until a click
-outside it, a call to `edit_unfocus`, or its window closing or being left
-out of a frame, wherever the mouse goes in the meantime. The field stays
-focused while its window is behind another window, under a popup of the
-window's own, or hidden, but it takes no keys until the window is in front,
-the popup is closed or the window is shown again. The mouse belongs to the
-ui while it is over a window or a popup, and while it holds a button that
-went down over one. A button that went down elsewhere keeps the mouse with
-the program until the button is released. A window or popup begun with
-`WINDOW_NO_INPUT`, such as a message log or a box of hover information,
-lets the mouse through to the program: it cannot be moved, scaled,
-scrolled or brought to the front, and its widgets take no clicks.
-Nuklear's `item_is_any_active` is true whenever the mouse is over a window,
-so it cannot tell which side the keys belong to.
+Clicking a text field gives it keyboard focus. It keeps focus until a click
+outside it, a call to `edit_unfocus`, or its window closing or being omitted
+from a frame. Moving the mouse does not change this. The field also stays
+focused while its window is behind another window, hidden, or covered by its own
+popup. It receives no keys until the window is in front, shown again, or the
+popup is closed.
+
+The ui owns mouse input while the pointer is over a window or popup, or while a
+button pressed there remains held. A button pressed elsewhere keeps mouse input
+with the program until release. A window or popup created with
+`WINDOW_NO_INPUT`, such as a message log or hover information, passes mouse
+input through to the program. It cannot be moved, scaled, scrolled, or brought
+to the front, and its widgets receive no clicks. Nuklear's `item_is_any_active`
+is true whenever the mouse is over a window, so it cannot determine who owns
+keyboard input.
 
 ### Text rendering and game HUDs
 

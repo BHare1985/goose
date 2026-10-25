@@ -32,13 +32,12 @@ goose build --dry-run foo.goose         # print the commands instead of running 
 goose build -v foo.goose                # print them as they run
 ```
 
-`build` finds a C compiler on the machine (`goose toolchain` shows which
-one: MSVC or clang on Windows, cc, gcc or clang elsewhere; `--cc clang`,
-`GOOSE_CC`, or `cc = "clang";` in `~/.goose/config` select one). It
-compiles the runtime once per compiler into `~/.goose`, and links the
-program with the native parts of every package it uses.
-`goose check foo.goose` only typechecks. A build and a run both default to
-`-O2`.
+`build` finds an installed C compiler: MSVC or clang on Windows, and cc, gcc, or
+clang elsewhere. `goose toolchain` shows which one it found. To select a
+compiler, use `--cc clang`, `GOOSE_CC`, or `cc = "clang";` in `~/.goose/config`.
+The runtime is compiled once per compiler into `~/.goose`, and the program is
+linked with the native parts of its packages. `goose check foo.goose` only
+typechecks. Both build and run default to `-O2`.
 
 Everything the compiler produces along the way goes under `~/.goose`
 (`GOOSE_HOME` moves it): fetched packages, their builds, the runtime
@@ -169,19 +168,20 @@ declares the package, and the examples run on their own.
 
 ### The native part
 
-A package over a library that is installed on the machine, or shipped
-beside the program, may need no C of its own. An `extern "name" { ... }`
-block declares functions that are bound from that shared library by name
-when the program starts (spec §7.10). Where the spelling derived from a
-name that a block uses is wrong, the sidecar's `dylibs` list, with the
-platform suffixes, maps that name to the spelling to open:
-`dylibs_linux = ["SDL2=libSDL2-2.0.so.0"];`. A package maps its own names
-as defaults. The program's sidecar can map a name for any package it uses,
-and for the names it mentions, its mapping takes precedence, platform by
-platform. A name that no block declares is an error. A program that calls
-only such functions builds and links nothing, and runs under `goose run`
-with no C toolchain installed. The rest of this section is about C that
-the package compiles itself.
+A package can call a library installed on the machine or shipped beside the
+program without compiling C of its own. An `extern "name" { ... }` block
+declares functions to load from that shared library by name at program startup
+(spec §7.10).
+
+If the name produces the wrong library filename, map it in the sidecar's
+`dylibs` list using a platform suffix, for example `dylibs_linux =
+["SDL2=libSDL2-2.0.so.0"];`. A package supplies defaults for its own names. The
+program's sidecar can override any of those names, with precedence determined
+separately for each platform. Mapping a name that no block declares is an error.
+
+A program that calls only these functions compiles and links no native code and
+can run with `goose run` without a C toolchain. The rest of this section covers
+packages that compile their own C.
 
 The sidecar names the C in one of two ways. The first is plain sources,
 which the compiler compiles with the given includes, defines, flags and

@@ -407,10 +407,9 @@ small.push('h'); small.push('i');
 Which to reach for:
 
 * **`[>..]` is the default.** Use it for arenas, pools, string builders, tree
-  storage, and scratch space that is refilled between phases. "Grow-only"
-  names a *guarantee*, that references into the array stay valid, rather than
-  the set of operations: the array can still `pop` and `clear` at points
-  where the compiler can see that nothing points into it.
+  storage, and scratch space refilled between phases. "Grow-only" guarantees
+  that references into the array stay valid. You can still use `pop` and `clear`
+  where the compiler can prove that nothing points into it.
 * **`[>..<]`** for a stack or priority queue. The restriction is that
   references into it may be held in variables only, never in storage, so
   that the compiler can track them when it checks a shrink.
@@ -710,13 +709,11 @@ print(book[0]);                 // error: arrays of variable-size elements
                                 // cannot be indexed, only iterated
 ```
 
-This is a real restriction, and it is why the array family has both kinds.
-Use variable elements for things you walk (records, parsed nodes, log lines);
-use fixed elements, with a `u8[..k]` for the string part, for things you
-index and sort. When you need both, keep an index beside the compact array: a
-second array of references to its elements can be indexed and sorted while
-the elements stay packed where they are. Section 10 ends with an example of
-such an index.
+Use variable elements for data you traverse, such as records, parsed nodes, and
+log lines. Use fixed elements for data you index and sort, with a `u8[..k]` if
+an element needs a string. When you need both, keep a second array of references
+as an index. You can index and sort those references while the variable-size
+elements stay packed in place. Section 10 ends with an example.
 
 ---
 
@@ -1079,12 +1076,11 @@ the trailing `bool` you have already seen is enough
 copies nothing because it is a reference into the input. Both are ordinary
 return values.
 
-The mechanism that is not obvious is **`return E from f`**. It returns `E`
-as the result of the innermost active call of `f`, unwinding every frame in
-between. It is the language's lightweight exception, and it exists because
-the two idioms above scale badly: without it, a failure eight frames deep
-inside a parser would mean eight signatures carrying an error they have
-nothing to do with.
+**`return E from f`** returns `E` as the result of the innermost active call of
+`f`, unwinding every frame in between. It provides lightweight exceptions. With
+the two idioms above, a failure eight calls deep in a parser would require all
+eight functions to carry an error in their signatures, even if they only pass it
+along.
 
 ```goose
 fn load(text: u8[:]) -> User[>..], u8[] {
@@ -1246,12 +1242,11 @@ fn first_multiple_of_7(lo: i64, hi: i64) -> i64 {
 }
 ```
 
-Nested functions can use the enclosing function's locals, and the parsers in
-the samples are written that way: the input, cursor and pools are locals of
-`parse`, and the recursive descent functions nested inside `parse` use them
-as free variables instead of passing a state struct around
-([`17_calc`](../samples/17_calc.goose),
-[`18_json`](../samples/18_json.goose)).
+Nested functions can use their enclosing function's locals. The sample parsers
+use this to share their input, cursor, and pools: all are locals of `parse`,
+accessible to the recursive descent functions nested inside it. This avoids
+passing a state struct through every call
+([`17_calc`](../samples/17_calc.goose), [`18_json`](../samples/18_json.goose)).
 
 Recursion is opt-in and annotated. The entry of a recursive cycle is a
 `recursive fn`, every function in the cycle needs an explicit signature, and
@@ -1667,9 +1662,9 @@ a few more limits; see
   `std`, `dictionary`, `vec`, `math`, `os`, `binary`, `base64`, `csv`,
   `json`, `regex`, `audio`, `gfx`, `physics`, and `ui`, with Goose interfaces
   under `stdlib/`.
-* **[`docs/goose_spec.md`](goose_spec.md)** — the actual rules, when you want
-  to know why something did not compile. It is precise rather than friendly,
-  and it is where every "spec §" in this document points.
+* **[`docs/goose_spec.md`](goose_spec.md)** — the detailed language rules,
+  including why a program may fail to compile. Every "spec §" link in this
+  tutorial points there.
 * **[`bench/`](../bench/summary.md)** — the numbers and the design notes
   behind them.
 * **[`docs/implementation.md`](implementation.md)** — how the compiler works,

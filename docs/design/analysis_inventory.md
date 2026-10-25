@@ -145,15 +145,25 @@ the pointee (`root`), whether that variable owns it (`rootexact`), and the
 ordering "A outlives B iff `depth(A) <= depth(B)`" along the compile-time
 call path. Temporaries get a `VarDef` of their own one scope deeper.
 
-**How.** Each value has one root. A value that may be any of several values
-(branches, rebinds, a call's returns, dispatch arms) keeps the innermost
-root (`InnerRoot`) and records what that hides in bits: `intogs` (may point
-into a grow-shrink array the kept root does not hold), `cyclelocal` (may
-be rooted where a cycle stores nothing), `hidesclass` (may be a parameter
-class's pointee), `rootfrom` (the container an inexact read-back came out
-of, for diagnostics and store-record `src`), `slotread` (every alternative
-was loaded out of storage), `byteview`, `reached`. Holder values carry a
-second root (`holderroot`), variables a third (`contentroot`).
+**How.** Each value has one root. When branches, rebinds, call returns, or
+dispatch arms give a value several possible roots, `InnerRoot` keeps the
+innermost one. Additional fields record information that this choice would
+otherwise lose:
+
+* `intogs`: the value may point into a grow-shrink array that the kept root does
+  not hold.
+
+* `cyclelocal`: it may be rooted where a cycle stores nothing.
+
+* `hidesclass`: it may be a parameter class's pointee.
+
+* `rootfrom`: the container an inexact read-back came from, used for diagnostics
+  and the store record's `src`.
+
+* `slotread`: every alternative was loaded from storage.
+
+The record also includes `byteview` and `reached`. Holder values carry a second
+root (`holderroot`), and variables carry a third (`contentroot`).
 
 **Holes.** Each bit has to survive ~25 transformations: `MergeVals`,
 `DecayRef`, `SlotView`, `ReadBackLVal`, `DerefLValue`, `ContainerRead`,
@@ -548,16 +558,18 @@ legal, so the fixtures still decide. Prerequisite: item 1.
 
 ### 4. One storage and effect model for checker, BCE and codegen (medium effort)
 
-Define regions (a variable, a class root, a temporary, a global, static
-data) and one per-specialization summary computed once: regions reached,
-written, resized (with balance), stored into (with what), grown, returned,
-rebound optionals, free variables, and integers written. The checker's
-`NoteRootEvent`/`ShrinkTargets`/`RootCandidates`/`MayAliasRoots`/
-`NamedOutside`, BCE's `UltOf`/`Reach`/`AffectedByWrite`/`Effects`, and
-codegen's `CollectSpecs`/`RefTopsOk`/`SyncReach` become queries on it.
-This deletes three call-graph traversals and four alias oracles. It is
-natural to do together with item 3, since that is when the checker gets a
-summary fixpoint of its own.
+Define regions for variables, class roots, temporaries, globals, and static
+data. Compute one summary per specialization that records which regions it
+reaches, writes, resizes (including balance), stores into (including the stored
+values), grows, and returns. The summary also records rebound optionals, free
+variables, and integers written.
+
+Three sets of helpers would then query this summary: the checker's
+`NoteRootEvent`/`ShrinkTargets`/`RootCandidates`/`MayAliasRoots`/`NamedOutside`,
+BCE's `UltOf`/`Reach`/`AffectedByWrite`/`Effects`, and codegen's
+`CollectSpecs`/`RefTopsOk`/`SyncReach`. This would remove three call-graph
+traversals and four separate alias analyses. It fits with item 3, which gives
+the checker its own summary fixpoint.
 
 ### 5. Obligations instead of key facts (medium effort, after 3)
 
