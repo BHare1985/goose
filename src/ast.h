@@ -2790,6 +2790,17 @@ struct Ast {
         auto p = Lookup(&Namespace::functionmap, name, usens);
         return p ? *p : none;
     }
+    // A UFCS call's overload set past the scopes around it: that of the
+    // namespace the receiver's nominal type is declared in, where that is a
+    // named namespace declaring the name, else the call's own. A type's
+    // functions are its methods wherever it is used (§11.1).
+    const vector<SFunction *> &LookupMethods(string_view name, string_view usens,
+                                             const TypeExpr *recv) {
+        auto tns = NominalNs(recv);
+        if (auto n = tns.empty() ? nullptr : FindNS(tns))
+            if (auto it = n->functionmap.find(name); it != n->functionmap.end()) return it->second;
+        return LookupFunctions(name, usens);
+    }
 
     // The entry point: the root file's global `main` (an imported file's is
     // never registered, §11.1). Null when there is not exactly one.

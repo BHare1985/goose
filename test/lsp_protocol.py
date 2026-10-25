@@ -424,6 +424,12 @@ def check_lsp_protocol(exe, base):
     sindex = fixtures / "source_index.goose"
     stext = sindex.read_text(encoding="utf-8")
     queries(sindex, stext, open_fixture(sindex, stext))
+    # UFCS calls on a namespaced type, which resolve in its namespace before
+    # the global one: signature help, and the hover and definition of a call
+    # the check resolved and of one that matched no overload.
+    ufcs = fixtures / "ufcs_ns.goose"
+    utext = ufcs.read_text(encoding="utf-8")
+    queries(ufcs, utext, open_fixture(ufcs, utext))
 
     # Statements with errors inside the braces of a struct literal or a
     # match they opened: each published where it is, and nothing after

@@ -3027,8 +3027,10 @@ activation would treat that container as its own.
 
 **Resolution** (`CheckCall`, `typecheck_calls.h`): a UFCS call tries the
 member builtins first when the receiver is an array, then the functions the
-name reaches (a nested function in scope, else the namespace overload set),
-then the remaining builtins. A plain call tries functions, then builtins; a
+name reaches (a nested function in scope, else the set of the namespace the
+receiver's struct or enum type is declared in where that declares the name,
+else the namespace overload set: `Ast::LookupMethods`, §11.1), then the
+remaining builtins. A plain call tries functions, then builtins; a
 user overload set that shares a builtin's name (`format`) takes the calls
 it matches. `ResolveCall`:
 
@@ -7231,7 +7233,10 @@ in `SEMANTIC_TYPES`). Signature help finds the innermost call whose
 parentheses hold the position (`FileIndex::CallAt`), and counts the commas
 before the position to find the active parameter, leaving out commas in
 string and character literals and in comments. It lists the overloads of the
-callee's name, with the resolved one active. Completion (`Completion`) looks
+callee's name, with the resolved one active; for a UFCS call these are the
+ones the receiver's type selects (`MethodsOf`, from its clone's type), which
+is also where hover and definition look for a call the check left
+unresolved. Completion (`Completion`) looks
 at what precedes the name being typed:
 
 * After a `.`, it offers the members of the value before the `.`

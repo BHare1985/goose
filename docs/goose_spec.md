@@ -2369,8 +2369,9 @@ fn scaled(a: i32, b: i32 = 0, c: f32 = 1.0) -> f32 { ... }   // scaled(2) is sca
 ```
 
 * There are only free functions: no methods and no impl blocks. UFCS:
-  `x.f(a)` is exactly `f(x, a)`. Resolution tries fields and built-in
-  members first, then functions.
+  `x.f(a)` passes `x` as `f(x, a)` does. Resolution tries fields and
+  built-in members first, then functions, which it looks for in the
+  namespace of `x`'s type first (§11.1).
 * Parameters are `let` bindings by default: they are not reassigned, and
   their contents are as writable as their type says (§4.4). `var` makes the
   (by-value) parameter a reassignable local.
@@ -4173,12 +4174,17 @@ it leaves the caller's own facts about `src` intact.
   overload set is the set of the first namespace in this order that
   declares the name at all; sets never merge across namespaces (a
   namespaced `hash` overload reaches the global integer overloads as
-  `::hash(x)`). UFCS follows the same rule for the calling code's
-  namespace, and a generic body resolves names where it is defined. The
-  `format` hook is the only type-directed exception (§3.7). Namespaces
-  affect only name resolution, type identity and generated C names (§7.10);
-  they have no runtime representation, and they provide no privacy and no
-  re-exports.
+  `::hash(x)`). A generic body resolves names where it is defined. A UFCS
+  call `x.f(...)` resolves `f` by the same rule, except that when `x`'s
+  struct or enum type is declared in a named namespace that declares
+  `f`, that namespace's set is the one used, ahead of the calling code's
+  namespace and the global one (a nested function in scope still hides
+  it). So a type's functions are its methods wherever it is used, in a
+  generic body too, while a plain call `f(x)` looks only where the calling
+  code does. The `format` hook is likewise looked up by type (§3.7).
+  Namespaces affect only name resolution, type identity and generated C
+  names (§7.10); they have no runtime representation, and they provide no
+  privacy and no re-exports.
 * Globals are declared like locals (`let`/`var`, any type including
   resizable). Semantically, the program runs inside an implicit outermost
   scope that owns the globals. They take part in the depth check (§9.2) as
