@@ -21,7 +21,7 @@ Three facts remain separate:
   result's destination.
 
 A named return has a symbolic receiver. Relative initializers add
-requirements relating that receiver to the roots their targets inhabit.
+requirements relating that receiver to the roots that contain their targets.
 Calls map those roots through their arguments and check the requirements
 against the actual receiver. A forwarding return carries the requirement
 on to its own caller. Captured roots in trailing blocks use the same
@@ -51,8 +51,9 @@ Self-contained `self` and null links remain valid in representation
 conversions that preserve their region. A result requiring its receiver's
 root cannot pass through an adapter that stages or relocates its bytes.
 Identical representations and constructing a variant directly behind its
-ADT tag are supported. Such a result also cannot be a resize fill, which
-constructs a value once and copies it to multiple slots.
+ADT tag are supported. A result requiring its receiver's root also cannot be
+a resize fill, which constructs a value once and copies it to multiple
+slots.
 
 The existing growth, shrink, lifetime and partial-construction rules remain
 in force. A callback executes once at the construction site. A push exposes
