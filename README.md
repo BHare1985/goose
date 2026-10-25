@@ -12,7 +12,7 @@ C++ and Rust while using less memory.
 [Standard library](docs/stdlib.md)
 
 Goose has syntax familiar to C and Rust programmers, but **there is no heap**.
-Every dynamic value lives inline on a data stack managed by the compiler.
+Every dynamic value lives inline on data stacks managed by the compiler.
 Growth advances a pointer, and memory is freed when its scope ends. The
 language's type and lifetime rules make this memory model safe to use.
 
@@ -35,19 +35,19 @@ language's type and lifetime rules make this memory model safe to use.
   references where C++ must call `reserve` and safe Rust uses `u32` indices.
 * **Memory safe with zero annotations.** There is no lifetime syntax, there
   are no aliasing or exclusivity rules, and there is no `unsafe`. The compiler
-  infers what every reference is rooted in and rejects references that could
+  infers what every reference is rooted at and rejects references that could
   outlive their owners.
 * **Nested data stays inline.** A string, an array of strings, a record with
   variable-size fields and an array of those records are each stored as one
-  contiguous block that contains no pointers. A record that takes 160 bytes
+  contiguous block that contains no pointers. A example record that takes 160 bytes
   and one allocation in C++ takes 29 bytes and no allocations in Goose.
-* **Enums that cost what they hold.** Variable-mode ADTs store each value at
+* **Variable sized Enums.** Variable-mode ADTs store each value at
   the size of its own variant rather than that of the largest variant. On the
   benchmark that exercises this, they use 4x less memory than a Rust `enum`
   and run at 2x its speed.
 * **Links narrower than pointers.** A relative reference stores a typed, checked
   link as a 1, 2 or 4-byte offset. Structures built from them are position
-  independent, so a data structure can be written to a file as it is. Saving
+  independent, so a data structure can be written to a file as is. Saving
   it is a single write, and loading it is a single read followed by a
   verification pass that rejects malformed or hostile data.
 * **Everything is built in place, guaranteed.** A value is constructed at its
@@ -57,15 +57,15 @@ language's type and lifetime rules make this memory model safe to use.
 * **Returns across multiple calls.** `return err from load` returns from a
   function any number of frames up the call stack. It is checked statically,
   and needs no unwinder, no `Result` type and no `?` on every call.
-* **Threads that share nothing.** A worker is compiled as a separate program
+* **Threads with no shared memory.** A worker is compiled as a separate program
   with its own memory, and flat values are passed between threads through
   typed queues with a `memcpy`. Data races, locks, atomics and memory
   orderings do not exist in the language.
 * **Generics and higher-order functions with no overhead.** An untyped
   parameter is generic. Function values are compile-time entities, so
-  `xs.filter() { it > 0 }` compiles to the loop it looks like and builds its
+  `xs.filter() { it > 0 }` compiles to what the handwrittend loop would looks like and builds its
   result directly in its destination.
-* **Plain C in, plain C out.** Goose compiles to one C file, so it runs wherever
+* **Compiles to C and can call C.** Goose compiles to one C file, so it runs wherever
   a C compiler does and calls C directly through `extern fn`. The bundled
   TinyCC backend compiles and runs a program in-process, with no build step.
 
@@ -98,7 +98,7 @@ for round in 3 {
 }                                                     // the free: one store to the stack top
 ```
 
-### Nothing moves, so references survive growth
+### Memory never moves, so references survive growth
 
 ```goose
 struct Item { id: i32, weight: f32 }
@@ -334,7 +334,7 @@ compiles to exactly the loop it looks like. A block may `return` from its
 lexically enclosing function, and nested functions can use the enclosing
 function's locals.
 
-### Threads that share nothing
+### Threads with no shared memory
 
 ```goose
 thread_fn worker() {                                // a separate program with its own memory
