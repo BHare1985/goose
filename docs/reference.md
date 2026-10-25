@@ -999,7 +999,8 @@ value or by reference, is called to render a `T` wherever a `T` occurs in
 an argument of any of the three builtins, so a type defines its text form
 in one place. The overload is looked up in the namespace `T` is declared
 in, then globally, so the type decides how it is printed, not the code
-that prints it.
+that prints it. A `T` that is not fixed-size is never copied implicitly,
+so its overload takes it by reference.
 
 ```goose
 struct Person { name: u8[..16], age: i32 }

@@ -598,7 +598,8 @@ rendering: its thread runs out of native stack, which is a safe abort
 A user overload `fn format(out: u8[>..]&, v: T)` (taking `T` by value or by
 reference) is used instead to render a `T`, wherever a `T` occurs in an
 argument, so a type can choose its own text once for all three builtins.
-An overload that takes the `T` by reference is given the storage the `T`
+A `T` that is not fixed-size is never copied implicitly (§4.1), so its
+overload takes it by reference. An overload that takes the `T` by reference is given the storage the `T`
 lies in, as a reference parameter is (§4.1): the variable, field or element
 holding it, or what a reference argument names, and it is as writable as
 that storage is (§9.5). A `T` that is not storage lies in a read-only
