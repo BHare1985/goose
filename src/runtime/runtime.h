@@ -25,6 +25,16 @@
      GS_RUNTIME_VERSION names gs_rt_start after the runtime's text, so a
      program linked with another compiler's runtime fails to link. */
 
+/* SRW locks, condition variables, and GetTickCount64 require Windows Vista.
+   Set the target before any system header can supply an older default. */
+#ifdef _WIN32
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#elif _WIN32_WINNT < 0x0600
+#error "Goose requires Windows Vista or later (_WIN32_WINNT >= 0x0600)"
+#endif
+#endif
+
 /* The OS layer (runtime_os.h) opens files on Windows with _wfopen, which the
    Microsoft CRT deprecates in favour of its own _s variant. */
 #ifndef _CRT_SECURE_NO_WARNINGS
