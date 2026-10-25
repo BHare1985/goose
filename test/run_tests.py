@@ -76,6 +76,7 @@ import argparse
 import json
 import concurrent.futures
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -1894,6 +1895,80 @@ def main():
                 out = r.run_expected([out_exe], name, f"clang-{label} {name}.goose")
                 if out is not None and r.check_stdout(name, f"clang-{label}", out):
                     r.ok(f"{label}-clang {name}.goose")
+        # math's mul_add is the one result a simd function's versions may give
+        # differently from its baseline (spec §7.12): rounded once where the
+        # code is built for FMA. Built by clang at each level, a plain
+        # function rounds as the target does (once on arm64, twice on a plain
+        # x86-64 build) and the simd function's versions round once, which on
+        # x86-64 a CPU with AVX2 and FMA runs at levels 1 and 2. Where the CPU
+        # can't be asked, levels 1 and 2 may give either.
+        def host_fma():
+            if tc.IS_WINDOWS:
+                try:
+                    import ctypes
+                    # PF_AVX2_INSTRUCTIONS_AVAILABLE; every CPU with AVX2
+                    # this runs on has FMA.
+                    return bool(ctypes.windll.kernel32.IsProcessorFeaturePresent(40))
+                except (AttributeError, OSError):
+                    return None
+            if sys.platform.startswith("linux"):
+                try:
+                    flags = set()
+                    for line in open("/proc/cpuinfo", encoding="utf-8"):
+                        if line.startswith("flags"):
+                            flags.update(line.split(":", 1)[1].split())
+                            break
+                    return "avx2" in flags and "fma" in flags
+                except OSError:
+                    return None
+            return None
+
+        def clang_mul_add():
+            name = "simd_mul_add"
+            arm = platform.machine().lower() in ("arm64", "aarch64")
+            fma = host_fma()
+            # The program reports five calls: a plain function's, then in a
+            # simd function a direct call, an inline helper's, a plain
+            # helper's and one through a function value. At Goose -O2 the
+            # helpers are inlined (the plain one may or may not be); at -O0
+            # nothing is, and both keep the plain function's rounding.
+            for gopt in ("-O2", "-O0"):
+                tag = gopt[1:].lower()
+                src = gendir / f"muladdclang-{tag}.c"
+                code, out, err = r.goose(gopt, "-o", src, HERE / "codegen" / f"{name}.goose")
+                if code != 0:
+                    r.fail(f"mul_add-clang{gopt} {name}.goose", out + err)
+                    continue
+                ctext = src.read_text(encoding="utf-8")
+                if not re.search(r"#define GS_MUL_ADD_MODE fused\nGS_SIMD_TARGET1 static [^\n]*"
+                                 r"\bdirect_g\w*_simd1\(", ctext):
+                    r.fail(f"mul_add-clang{gopt} {name}.goose", "no fused mode around the AVX2 version")
+                    continue
+                for level in ("2", "1", "0"):
+                    label = f"mul_add-simd{level}-clang{gopt} {name}.goose"
+                    out_exe = gendir / f"muladdclang-{tag}-{level}{tc.EXE_SUFFIX}"
+                    ok, log = clang.compile(src, out_exe, opt=2, warn="off", strict_decls=True,
+                                            defines=[f"GS_SIMD={level}"], runtime=r.runtime,
+                                            log=gendir / f"muladdclang-{tag}-{level}.log")
+                    if not ok:
+                        r.fail(label, "\n".join(log.splitlines()[:8]))
+                        continue
+                    out = r.check_run(name, label, *tc.run_capture([out_exe, "modes"]))
+                    if out is None:
+                        continue
+                    lines = out.splitlines()
+                    got = lines[-1].split() if lines else []
+                    plain = {"fused" if arm else "separate"}
+                    simd = ({"fused"} if arm else {"separate"} if level == "0" else
+                            {"fused", "separate"} if fma is None else {"fused" if fma else "separate"})
+                    inlined = simd if gopt == "-O2" else plain
+                    want = [plain, simd, inlined, simd | plain if gopt == "-O2" else plain, simd]
+                    if len(lines) != 2 or lines[0] != "true" or len(got) != len(want) or                             any(g not in w for g, w in zip(got, want)):
+                        r.fail(label, f"got {out!r}; want " +
+                               " ".join("|".join(sorted(w)) for w in want))
+                    else:
+                        r.ok(label)
+
         if args.profile == "sanitize":
             pass  # The full generated-C suite already ran through Clang.
         elif not clang:
@@ -1904,6 +1979,7 @@ def main():
                         clang_simd_versions)
             r.show_task(clang_simd, "stdlib_base64", HERE / "stdlib" / "stdlib_base64.goose",
                         clang_simd_named("base64_encode", "base64_decode"))
+            r.show_task(clang_mul_add)
 
     r.section("driver, diagnostics and language server")
 
